@@ -1,0 +1,140 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.875rem;
+
+    /* White background */
+    --background: 1 0 0;
+    --foreground: 0.12 0.025 30;
+
+    --card: 1 0 0;
+    --card-foreground: 0.12 0.025 30;
+
+    --popover: 1 0 0;
+    --popover-foreground: 0.12 0.025 30;
+
+    /* Orange primary */
+    --primary: 0.62 0.22 43;
+    --primary-foreground: 1 0 0;
+
+    --secondary: 0.96 0.015 80;
+    --secondary-foreground: 0.3 0.05 30;
+
+    --muted: 0.96 0.008 60;
+    --muted-foreground: 0.52 0.02 40;
+
+    --accent: 0.96 0.015 80;
+    --accent-foreground: 0.3 0.05 30;
+
+    --destructive: 0.577 0.245 27.325;
+    --destructive-foreground: 1 0 0;
+
+    --border: 0.91 0.01 70;
+    --input: 0.91 0.01 70;
+    --ring: 0.62 0.22 43;
+
+    --chart-1: 0.646 0.222 41.116;
+    --chart-2: 0.6 0.118 184.704;
+    --chart-3: 0.398 0.07 227.392;
+    --chart-4: 0.828 0.189 84.429;
+    --chart-5: 0.769 0.188 70.08;
+
+    --sidebar: 0.985 0 0;
+    --sidebar-foreground: 0.145 0 0;
+    --sidebar-primary: 0.62 0.22 43;
+    --sidebar-primary-foreground: 1 0 0;
+    --sidebar-accent: 0.97 0 0;
+    --sidebar-accent-foreground: 0.205 0 0;
+    --sidebar-border: 0.922 0 0;
+    --sidebar-ring: 0.708 0 0;
+
+    /* POS custom vars */
+    --orange-start: #FF6B00;
+    --orange-end: #FFA500;
+    --glow-color: rgba(255, 107, 0, 0.45);
+    --glow-color-2: rgba(255, 165, 0, 0.35);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  .btn-glow {
+    background: linear-gradient(135deg, #FF6B00, #FFA500);
+    box-shadow: 0 0 20px rgba(255, 107, 0, 0.5), 0 4px 15px rgba(255, 165, 0, 0.4);
+    transition: all 0.2s ease;
+  }
+  .btn-glow:hover {
+    box-shadow: 0 0 30px rgba(255, 107, 0, 0.65), 0 6px 20px rgba(255, 165, 0, 0.55);
+    transform: translateY(-1px);
+  }
+  .btn-glow:active {
+    transform: translateY(0px) scale(0.98);
+    box-shadow: 0 0 12px rgba(255, 107, 0, 0.4), 0 2px 8px rgba(255, 165, 0, 0.3);
+  }
+
+  .pin-dot-filled {
+    background: linear-gradient(135deg, #FF6B00, #FFA500);
+    box-shadow: 0 0 10px rgba(255, 107, 0, 0.6);
+  }
+
+  .keypad-btn {
+    background: #fff;
+    border: 1.5px solid oklch(0.91 0.01 70);
+    transition: all 0.15s ease;
+  }
+  .keypad-btn:hover {
+    background: linear-gradient(135deg, rgba(255,107,0,0.08), rgba(255,165,0,0.12));
+    border-color: rgba(255, 107, 0, 0.4);
+  }
+  .keypad-btn:active {
+    background: linear-gradient(135deg, rgba(255,107,0,0.18), rgba(255,165,0,0.22));
+    transform: scale(0.95);
+  }
+
+  .screen-card {
+    background: #ffffff;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  @media (min-width: 768px) {
+    .screen-card {
+      max-width: 480px;
+      border-radius: 2rem;
+      box-shadow: 0 8px 48px rgba(255, 107, 0, 0.12), 0 2px 16px rgba(0,0,0,0.08);
+      margin: 0 auto;
+    }
+  }
+
+  .pos-background {
+    background: #ffffff;
+  }
+
+  @media (min-width: 768px) {
+    .pos-background {
+      background: linear-gradient(160deg, #fff9f3 0%, #fff3e6 50%, #fff7ee 100%);
+    }
+  }
+
+  .subtitle-text {
+    background: linear-gradient(135deg, #FF6B00, #FFA500);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+}
