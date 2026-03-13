@@ -10,7 +10,69 @@ import type { ActorMethod } from '@icp-sdk/core/agent';
 import type { IDL } from '@icp-sdk/core/candid';
 import type { Principal } from '@icp-sdk/core/principal';
 
-export interface _SERVICE { 'greet' : ActorMethod<[string], string> }
+export interface Analytics {
+  'totalOrders' : bigint,
+  'todaySales' : bigint,
+  'topItem' : [] | [string],
+}
+export interface MenuItem {
+  'id' : bigint,
+  'name' : string,
+  'createdAt' : bigint,
+  'available' : boolean,
+  'imageUrl' : string,
+  'category' : string,
+  'price' : bigint,
+}
+export interface Order {
+  'id' : bigint,
+  'total' : bigint,
+  'paymentStatus' : string,
+  'createdAt' : bigint,
+  'paymentMode' : string,
+  'items' : string,
+}
+export interface PaymentStatusResponse { 'status' : string, 'message' : string }
+export interface TransformationInput {
+  'context' : Uint8Array,
+  'response' : http_request_result,
+}
+export interface TransformationOutput {
+  'status' : bigint,
+  'body' : Uint8Array,
+  'headers' : Array<http_header>,
+}
+export interface http_header { 'value' : string, 'name' : string }
+export interface http_request_result {
+  'status' : bigint,
+  'body' : Uint8Array,
+  'headers' : Array<http_header>,
+}
+export interface _SERVICE {
+  'addMenuItem' : ActorMethod<[string, bigint, string, string], MenuItem>,
+  'checkPaymentStatus' : ActorMethod<
+    [string, bigint, string],
+    PaymentStatusResponse
+  >,
+  'confirmPayment' : ActorMethod<[bigint], undefined>,
+  'createOrder' : ActorMethod<[string, bigint, string], bigint>,
+  'deleteMenuItem' : ActorMethod<[bigint], undefined>,
+  'generateTransactionId' : ActorMethod<[], string>,
+  'getAnalytics' : ActorMethod<[], Analytics>,
+  'getMenu' : ActorMethod<[], Array<MenuItem>>,
+  'getOrder' : ActorMethod<[bigint], Order>,
+  'getOrders' : ActorMethod<[], Array<Order>>,
+  'getPaymentStatus' : ActorMethod<[bigint], string>,
+  'login' : ActorMethod<[string], [string, string]>,
+  'setPaymentStatusUrl' : ActorMethod<[[] | [string]], undefined>,
+  'startPayment' : ActorMethod<[bigint, bigint, string], string>,
+  'toggleAvailability' : ActorMethod<[bigint], undefined>,
+  'transform' : ActorMethod<[TransformationInput], TransformationOutput>,
+  'updateMenuItem' : ActorMethod<
+    [bigint, string, bigint, string, string],
+    MenuItem
+  >,
+}
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];
 export declare const idlFactory: IDL.InterfaceFactory;

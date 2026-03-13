@@ -7,5 +7,6 @@ export type Screen =
   | "dashboard"
   | "billing"
   | "menuManagement"
+  | "settings"
   | "payment"
   | "printBill";

@@ -1,9 +1,10 @@
-import { Menu, Minus, Plus, Search, ShoppingCart, Trash2 } from "lucide-react";
+import { Minus, Plus, Search, ShoppingCart, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Screen } from "../App";
 import { Footer } from "../components/Footer";
 import { GlowButton } from "../components/GlowButton";
+import { HeaderClock } from "../components/HeaderClock";
 import { type MenuItem, useMenu } from "../context/MenuContext";
 import type { CartItem } from "../types/payment";
 
@@ -11,7 +12,6 @@ interface BillingScreenProps {
   onNavigate: (screen: Screen) => void;
   onCheckout: (cart: CartItem[]) => void;
   darkMode: boolean;
-  onOpenSidebar?: () => void;
 }
 
 const categoryColors: Record<string, string> = {
@@ -19,20 +19,22 @@ const categoryColors: Record<string, string> = {
   "Non-Veg": "bg-red-100 text-red-700",
   Drinks: "bg-blue-100 text-blue-700",
   Snacks: "bg-yellow-100 text-yellow-700",
+  "Ice Cream": "bg-pink-100 text-pink-700",
 };
 
 export function BillingScreen({
   onNavigate: _onNavigate,
   onCheckout,
   darkMode,
-  onOpenSidebar,
 }: BillingScreenProps) {
   const { items } = useMenu();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
 
-  const filteredItems = items.filter((item) =>
-    item.name.toLowerCase().includes(search.toLowerCase()),
+  const filteredItems = items.filter(
+    (item) =>
+      item.available !== false &&
+      item.name.toLowerCase().includes(search.toLowerCase()),
   );
 
   const addToCart = (item: MenuItem) => {
@@ -55,7 +57,7 @@ export function BillingScreen({
     );
   };
 
-  const subtotal = cart.reduce((sum, c) => sum + c.item.price * c.qty, 0);
+  const total = cart.reduce((sum, c) => sum + c.item.price * c.qty, 0);
   const totalItems = cart.reduce((s, c) => s + c.qty, 0);
 
   const handleCheckout = () => {
@@ -67,10 +69,8 @@ export function BillingScreen({
   };
 
   const bg = darkMode ? "bg-gray-900" : "bg-gray-50";
-  const cardBg = darkMode ? "bg-gray-800" : "bg-white";
   const text = darkMode ? "text-white" : "text-gray-800";
   const subText = darkMode ? "text-gray-400" : "text-gray-500";
-  const border = darkMode ? "border-gray-700" : "border-gray-100";
   const headerBg = darkMode
     ? "bg-gray-900 border-gray-700"
     : "bg-white border-gray-100";
@@ -82,27 +82,16 @@ export function BillingScreen({
     <div className={`flex-1 flex flex-col ${bg}`}>
       {/* Header */}
       <header
-        className={`${headerBg} border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-10 shadow-xs`}
+        className={`${headerBg} border-b px-6 py-0 sticky top-0 z-10 shadow-sm`}
       >
-        <button
-          type="button"
-          onClick={onOpenSidebar}
-          data-ocid="header.sidebar.open_modal_button"
-          className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
-            darkMode
-              ? "text-gray-300 hover:bg-gray-700"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-        <h1 className={`font-display font-bold text-xl ${text}`}>Bill</h1>
-        <div className="ml-auto flex items-center gap-2">
-          <ShoppingCart className="w-5 h-5 text-orange-500" />
-          <span className="text-sm font-semibold text-orange-600">
-            {totalItems} items
-          </span>
+        <div className="flex items-center h-16">
+          <div className="flex-1" />
+          <h1 className={`font-bold text-xl tracking-wider ${text}`}>Bill</h1>
+          <div className="flex-1 flex justify-end">
+            <HeaderClock darkMode={darkMode} />
+          </div>
         </div>
+        <div className="h-0.5 bg-gradient-to-r from-orange-500 to-orange-300 -mx-6" />
       </header>
 
       {/* Body */}
@@ -144,7 +133,7 @@ export function BillingScreen({
                   type="button"
                   onClick={() => addToCart(item)}
                   data-ocid={`billing.menu.item.${idx + 1}`}
-                  className={`${cardBg} rounded-xl shadow-xs border ${border} overflow-hidden text-left hover:shadow-md hover:border-orange-200 active:scale-[0.97] transition-all duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400`}
+                  className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden text-left hover:shadow-md hover:border-orange-300 active:scale-[0.97] transition-all duration-150 cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
                 >
                   <img
                     src={item.imageUrl}
@@ -177,11 +166,18 @@ export function BillingScreen({
         </div>
 
         {/* Cart - Right */}
-        <div
-          className={`md:w-80 lg:w-96 ${cardBg} border-t md:border-t-0 md:border-l ${border} flex flex-col`}
-        >
-          <div className={`p-4 border-b ${border}`}>
-            <h2 className={`font-display font-bold text-lg ${text}`}>Cart</h2>
+        <div className="md:w-96 lg:w-[420px] bg-white border border-gray-200 rounded-l-2xl shadow-sm flex flex-col md:border-t-0 border-t">
+          {/* Cart Header */}
+          <div className="p-4 border-b border-gray-200">
+            <h2 className={`font-bold text-lg flex items-center gap-2 ${text}`}>
+              <ShoppingCart className="w-5 h-5 text-orange-500" />
+              Cart
+              {totalItems > 0 && (
+                <span className="text-orange-500 font-bold">
+                  ({totalItems})
+                </span>
+              )}
+            </h2>
           </div>
 
           <div className="flex-1 overflow-y-auto p-4">
@@ -225,7 +221,9 @@ export function BillingScreen({
                           <Trash2 className="w-3.5 h-3.5 text-red-500" />
                         ) : (
                           <Minus
-                            className={`w-3.5 h-3.5 ${darkMode ? "text-gray-300" : "text-gray-600"}`}
+                            className={`w-3.5 h-3.5 ${
+                              darkMode ? "text-gray-300" : "text-gray-600"
+                            }`}
                           />
                         )}
                       </button>
@@ -252,14 +250,10 @@ export function BillingScreen({
             )}
           </div>
 
-          <div className={`p-4 border-t ${border} space-y-3`}>
-            <div className={`flex justify-between text-sm ${subText}`}>
-              <span>Subtotal</span>
-              <span className="font-semibold text-green-600">₹{subtotal}</span>
-            </div>
+          <div className="p-4 border-t border-gray-200 space-y-3">
             <div className={`flex justify-between font-bold ${text}`}>
               <span>Total Amount</span>
-              <span className="text-green-600 text-lg">₹{subtotal}</span>
+              <span className="text-green-600 text-lg">₹{total}</span>
             </div>
             <GlowButton
               onClick={handleCheckout}

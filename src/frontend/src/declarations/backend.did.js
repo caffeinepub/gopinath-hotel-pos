@@ -8,14 +8,167 @@
 
 import { IDL } from '@icp-sdk/core/candid';
 
+export const MenuItem = IDL.Record({
+  'id' : IDL.Nat,
+  'name' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'available' : IDL.Bool,
+  'imageUrl' : IDL.Text,
+  'category' : IDL.Text,
+  'price' : IDL.Nat,
+});
+export const PaymentStatusResponse = IDL.Record({
+  'status' : IDL.Text,
+  'message' : IDL.Text,
+});
+export const Analytics = IDL.Record({
+  'totalOrders' : IDL.Nat,
+  'todaySales' : IDL.Nat,
+  'topItem' : IDL.Opt(IDL.Text),
+});
+export const Order = IDL.Record({
+  'id' : IDL.Nat,
+  'total' : IDL.Nat,
+  'paymentStatus' : IDL.Text,
+  'createdAt' : IDL.Int,
+  'paymentMode' : IDL.Text,
+  'items' : IDL.Text,
+});
+export const http_header = IDL.Record({
+  'value' : IDL.Text,
+  'name' : IDL.Text,
+});
+export const http_request_result = IDL.Record({
+  'status' : IDL.Nat,
+  'body' : IDL.Vec(IDL.Nat8),
+  'headers' : IDL.Vec(http_header),
+});
+export const TransformationInput = IDL.Record({
+  'context' : IDL.Vec(IDL.Nat8),
+  'response' : http_request_result,
+});
+export const TransformationOutput = IDL.Record({
+  'status' : IDL.Nat,
+  'body' : IDL.Vec(IDL.Nat8),
+  'headers' : IDL.Vec(http_header),
+});
+
 export const idlService = IDL.Service({
-  'greet' : IDL.Func([IDL.Text], [IDL.Text], []),
+  'addMenuItem' : IDL.Func(
+      [IDL.Text, IDL.Nat, IDL.Text, IDL.Text],
+      [MenuItem],
+      [],
+    ),
+  'checkPaymentStatus' : IDL.Func(
+      [IDL.Text, IDL.Nat, IDL.Text],
+      [PaymentStatusResponse],
+      [],
+    ),
+  'confirmPayment' : IDL.Func([IDL.Nat], [], []),
+  'createOrder' : IDL.Func([IDL.Text, IDL.Nat, IDL.Text], [IDL.Nat], []),
+  'deleteMenuItem' : IDL.Func([IDL.Nat], [], []),
+  'generateTransactionId' : IDL.Func([], [IDL.Text], []),
+  'getAnalytics' : IDL.Func([], [Analytics], ['query']),
+  'getMenu' : IDL.Func([], [IDL.Vec(MenuItem)], ['query']),
+  'getOrder' : IDL.Func([IDL.Nat], [Order], ['query']),
+  'getOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+  'getPaymentStatus' : IDL.Func([IDL.Nat], [IDL.Text], ['query']),
+  'login' : IDL.Func([IDL.Text], [IDL.Text, IDL.Text], []),
+  'setPaymentStatusUrl' : IDL.Func([IDL.Opt(IDL.Text)], [], []),
+  'startPayment' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Text], [IDL.Text], []),
+  'toggleAvailability' : IDL.Func([IDL.Nat], [], []),
+  'transform' : IDL.Func(
+      [TransformationInput],
+      [TransformationOutput],
+      ['query'],
+    ),
+  'updateMenuItem' : IDL.Func(
+      [IDL.Nat, IDL.Text, IDL.Nat, IDL.Text, IDL.Text],
+      [MenuItem],
+      [],
+    ),
 });
 
 export const idlInitArgs = [];
 
 export const idlFactory = ({ IDL }) => {
-  return IDL.Service({ 'greet' : IDL.Func([IDL.Text], [IDL.Text], []) });
+  const MenuItem = IDL.Record({
+    'id' : IDL.Nat,
+    'name' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'available' : IDL.Bool,
+    'imageUrl' : IDL.Text,
+    'category' : IDL.Text,
+    'price' : IDL.Nat,
+  });
+  const PaymentStatusResponse = IDL.Record({
+    'status' : IDL.Text,
+    'message' : IDL.Text,
+  });
+  const Analytics = IDL.Record({
+    'totalOrders' : IDL.Nat,
+    'todaySales' : IDL.Nat,
+    'topItem' : IDL.Opt(IDL.Text),
+  });
+  const Order = IDL.Record({
+    'id' : IDL.Nat,
+    'total' : IDL.Nat,
+    'paymentStatus' : IDL.Text,
+    'createdAt' : IDL.Int,
+    'paymentMode' : IDL.Text,
+    'items' : IDL.Text,
+  });
+  const http_header = IDL.Record({ 'value' : IDL.Text, 'name' : IDL.Text });
+  const http_request_result = IDL.Record({
+    'status' : IDL.Nat,
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(http_header),
+  });
+  const TransformationInput = IDL.Record({
+    'context' : IDL.Vec(IDL.Nat8),
+    'response' : http_request_result,
+  });
+  const TransformationOutput = IDL.Record({
+    'status' : IDL.Nat,
+    'body' : IDL.Vec(IDL.Nat8),
+    'headers' : IDL.Vec(http_header),
+  });
+  
+  return IDL.Service({
+    'addMenuItem' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Text, IDL.Text],
+        [MenuItem],
+        [],
+      ),
+    'checkPaymentStatus' : IDL.Func(
+        [IDL.Text, IDL.Nat, IDL.Text],
+        [PaymentStatusResponse],
+        [],
+      ),
+    'confirmPayment' : IDL.Func([IDL.Nat], [], []),
+    'createOrder' : IDL.Func([IDL.Text, IDL.Nat, IDL.Text], [IDL.Nat], []),
+    'deleteMenuItem' : IDL.Func([IDL.Nat], [], []),
+    'generateTransactionId' : IDL.Func([], [IDL.Text], []),
+    'getAnalytics' : IDL.Func([], [Analytics], ['query']),
+    'getMenu' : IDL.Func([], [IDL.Vec(MenuItem)], ['query']),
+    'getOrder' : IDL.Func([IDL.Nat], [Order], ['query']),
+    'getOrders' : IDL.Func([], [IDL.Vec(Order)], ['query']),
+    'getPaymentStatus' : IDL.Func([IDL.Nat], [IDL.Text], ['query']),
+    'login' : IDL.Func([IDL.Text], [IDL.Text, IDL.Text], []),
+    'setPaymentStatusUrl' : IDL.Func([IDL.Opt(IDL.Text)], [], []),
+    'startPayment' : IDL.Func([IDL.Nat, IDL.Nat, IDL.Text], [IDL.Text], []),
+    'toggleAvailability' : IDL.Func([IDL.Nat], [], []),
+    'transform' : IDL.Func(
+        [TransformationInput],
+        [TransformationOutput],
+        ['query'],
+      ),
+    'updateMenuItem' : IDL.Func(
+        [IDL.Nat, IDL.Text, IDL.Nat, IDL.Text, IDL.Text],
+        [MenuItem],
+        [],
+      ),
+  });
 };
 
 export const init = ({ IDL }) => { return []; };

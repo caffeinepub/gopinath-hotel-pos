@@ -1,11 +1,8 @@
 import {
   ArrowLeft,
-  Menu,
-  Moon,
   Pencil,
   Plus,
   Search,
-  Sun,
   Tag,
   Trash2,
   UtensilsCrossed,
@@ -14,14 +11,20 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import type { Screen } from "../App";
 import { Footer } from "../components/Footer";
-import { GlowButton } from "../components/GlowButton";
+import { HeaderClock } from "../components/HeaderClock";
 import {
   type MenuCategory,
   type MenuItem,
   useMenu,
 } from "../context/MenuContext";
 
-const CATEGORIES: MenuCategory[] = ["Veg", "Non-Veg", "Drinks", "Snacks"];
+const CATEGORIES: MenuCategory[] = [
+  "Veg",
+  "Non-Veg",
+  "Drinks",
+  "Snacks",
+  "Ice Cream",
+];
 const FILTERS = ["All", ...CATEGORIES] as const;
 type Filter = (typeof FILTERS)[number];
 
@@ -30,13 +33,13 @@ const categoryColors: Record<string, string> = {
   "Non-Veg": "bg-red-100 text-red-700",
   Drinks: "bg-blue-100 text-blue-700",
   Snacks: "bg-yellow-100 text-yellow-700",
+  "Ice Cream": "bg-pink-100 text-pink-700",
 };
 
 interface MenuManagementScreenProps {
   onNavigate: (screen: Screen) => void;
   darkMode: boolean;
   toggleDarkMode: () => void;
-  onOpenSidebar?: () => void;
 }
 
 type FormMode = "add" | "edit";
@@ -44,10 +47,10 @@ type FormMode = "add" | "edit";
 export function MenuManagementScreen({
   onNavigate: _onNavigate,
   darkMode,
-  toggleDarkMode,
-  onOpenSidebar,
+  toggleDarkMode: _toggleDarkMode,
 }: MenuManagementScreenProps) {
-  const { items, addItem, deleteItem, updateItem } = useMenu();
+  const { items, addItem, deleteItem, updateItem, toggleAvailability } =
+    useMenu();
   const [showForm, setShowForm] = useState(false);
   const [formMode, setFormMode] = useState<FormMode>("add");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -63,7 +66,7 @@ export function MenuManagementScreen({
   const cardBg = darkMode ? "bg-gray-800" : "bg-white";
   const text = darkMode ? "text-white" : "text-gray-800";
   const subText = darkMode ? "text-gray-400" : "text-gray-500";
-  const border = darkMode ? "border-gray-700" : "border-gray-100";
+  const border = darkMode ? "border-gray-700" : "border-gray-200";
   const headerBg = darkMode
     ? "bg-gray-900 border-gray-700"
     : "bg-white border-gray-100";
@@ -123,6 +126,7 @@ export function MenuManagementScreen({
     }
 
     if (formMode === "edit" && editingId) {
+      const existing = items.find((i) => i.id === editingId);
       const updatedItem: MenuItem = {
         id: editingId,
         name: name.trim(),
@@ -131,6 +135,7 @@ export function MenuManagementScreen({
         imageUrl:
           imagePreview ??
           `https://placehold.co/200x150/FF6B00/white?text=${encodeURIComponent(name.trim().slice(0, 8))}`,
+        available: existing?.available !== false,
       };
       updateItem(updatedItem);
       toast.success(`"${updatedItem.name}" updated!`);
@@ -143,6 +148,7 @@ export function MenuManagementScreen({
         imageUrl:
           imagePreview ??
           `https://placehold.co/200x150/FF6B00/white?text=${encodeURIComponent(name.trim().slice(0, 8))}`,
+        available: true,
       };
       addItem(newItem);
       toast.success(`"${newItem.name}" added to menu!`);
@@ -165,39 +171,19 @@ export function MenuManagementScreen({
     <div className={`flex-1 flex flex-col ${bg}`}>
       {/* Header */}
       <header
-        className={`${headerBg} border-b px-4 py-3 flex items-center gap-3 sticky top-0 z-10 shadow-xs`}
+        className={`${headerBg} border-b px-6 py-0 sticky top-0 z-10 shadow-sm`}
       >
-        <button
-          type="button"
-          onClick={onOpenSidebar}
-          data-ocid="header.sidebar.open_modal_button"
-          className={`w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
-            darkMode
-              ? "text-gray-300 hover:bg-gray-700"
-              : "text-gray-600 hover:bg-gray-100"
-          }`}
-        >
-          <Menu className="w-5 h-5" />
-        </button>
-        <h1 className={`font-display font-bold text-xl ${text}`}>Menu</h1>
-        <button
-          type="button"
-          onClick={toggleDarkMode}
-          className={`ml-auto w-9 h-9 rounded-xl flex items-center justify-center transition-colors ${
-            darkMode
-              ? "hover:bg-gray-700 text-yellow-300"
-              : "hover:bg-gray-100 text-gray-600"
-          }`}
-        >
-          {darkMode ? (
-            <Sun className="w-4 h-4" />
-          ) : (
-            <Moon className="w-4 h-4" />
-          )}
-        </button>
+        <div className="flex items-center h-16">
+          <div className="flex-1" />
+          <h1 className={`font-bold text-xl tracking-wider ${text}`}>Menu</h1>
+          <div className="flex-1 flex justify-end">
+            <HeaderClock darkMode={darkMode} />
+          </div>
+        </div>
+        <div className="h-0.5 bg-gradient-to-r from-orange-500 to-orange-300 -mx-6" />
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 max-w-2xl mx-auto w-full">
+      <div className="flex-1 overflow-y-auto p-4">
         {/* Form */}
         {showForm ? (
           <div
@@ -217,7 +203,7 @@ export function MenuManagementScreen({
               <ArrowLeft className="w-4 h-4" />
               Back
             </button>
-            <h2 className={`font-display font-bold text-lg ${text} mb-4`}>
+            <h2 className={`font-bold text-lg ${text} mb-4`}>
               {formMode === "edit" ? "Edit Menu Item" : "New Menu Item"}
             </h2>
             <div className="space-y-4">
@@ -342,27 +328,28 @@ export function MenuManagementScreen({
           </div>
         ) : (
           <>
-            {/* Add Button */}
-            <GlowButton
-              onClick={openAddForm}
-              data-ocid="menu.add.primary_button"
-              className="max-w-xs mb-6"
-            >
-              <Plus className="w-5 h-5 inline mr-2" />
-              Add Menu Item
-            </GlowButton>
-
-            {/* Search */}
-            <div className="relative mb-4">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search menu items..."
-                data-ocid="menu.search.search_input"
-                className={`w-full h-10 pl-10 pr-4 rounded-xl border text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-colors ${inputBg}`}
-              />
+            {/* Search bar + Add button inline */}
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="relative max-w-xs w-full">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search menu items..."
+                  data-ocid="menu.search.search_input"
+                  className={`w-full h-10 pl-10 pr-4 rounded-xl border text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-colors ${inputBg}`}
+                />
+              </div>
+              <button
+                type="button"
+                onClick={openAddForm}
+                data-ocid="menu.add.primary_button"
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-sm hover:shadow-orange-200 hover:scale-[1.02] transition-all duration-200 active:scale-[0.98] whitespace-nowrap"
+              >
+                <Plus className="w-4 h-4" />
+                Add Item
+              </button>
             </div>
 
             {/* Filters */}
@@ -405,58 +392,113 @@ export function MenuManagementScreen({
                 </p>
               </div>
             ) : (
-              <div className="space-y-3">
-                {filteredItems.map((item, idx) => (
-                  <div
-                    key={item.id}
-                    data-ocid={`menu.items.item.${idx + 1}`}
-                    className={`${cardBg} rounded-2xl shadow-xs border ${border} p-3 flex items-center gap-3 hover:shadow-sm transition-shadow`}
-                  >
-                    <img
-                      src={item.imageUrl}
-                      alt={item.name}
-                      className="w-14 h-14 rounded-xl object-cover flex-shrink-0"
-                      onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          `https://placehold.co/56x56/FF6B00/white?text=${encodeURIComponent(item.name.slice(0, 2))}`;
-                      }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className={`font-semibold truncate ${text}`}>
-                        {item.name}
-                      </p>
-                      <span
-                        className={`inline-block text-xs px-2 py-0.5 rounded-full mt-0.5 font-medium ${
-                          categoryColors[item.category] ??
-                          "bg-gray-100 text-gray-600"
-                        }`}
-                      >
-                        {item.category}
-                      </span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                {filteredItems.map((item, idx) => {
+                  const isAvailable = item.available !== false;
+                  return (
+                    <div
+                      key={item.id}
+                      data-ocid={`menu.items.item.${idx + 1}`}
+                      className={`${cardBg} rounded-2xl border ${border} shadow-sm flex flex-col overflow-hidden hover:shadow-md transition-shadow ${
+                        !isAvailable ? "opacity-70" : ""
+                      }`}
+                    >
+                      <div className="relative">
+                        <img
+                          src={item.imageUrl}
+                          alt={item.name}
+                          className="w-full aspect-[4/3] object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src =
+                              `https://placehold.co/200x150/FF6B00/white?text=${encodeURIComponent(item.name.slice(0, 2))}`;
+                          }}
+                        />
+                        {/* Edit/Delete overlay */}
+                        <div className="absolute top-1.5 right-1.5 flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => openEditForm(item)}
+                            data-ocid={`menu.edit.edit_button.${idx + 1}`}
+                            className="w-7 h-7 rounded-lg bg-white/90 backdrop-blur-sm flex items-center justify-center text-orange-500 hover:bg-orange-50 hover:text-orange-600 shadow-sm transition-colors"
+                            title="Edit item"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(item)}
+                            data-ocid={`menu.delete.delete_button.${idx + 1}`}
+                            className="w-7 h-7 rounded-lg bg-white/90 backdrop-blur-sm flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 shadow-sm transition-colors"
+                            title="Delete item"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      <div className="p-3 flex flex-col flex-1">
+                        <p
+                          className={`font-semibold text-sm truncate ${text} mb-1`}
+                        >
+                          {item.name}
+                        </p>
+                        <span
+                          className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium mb-2 self-start ${
+                            categoryColors[item.category] ??
+                            "bg-gray-100 text-gray-600"
+                          }`}
+                        >
+                          {item.category}
+                        </span>
+                        {/* Price + Availability Toggle */}
+                        <div className="flex items-center justify-between mt-auto gap-1">
+                          <p className="font-bold text-green-600 text-sm">
+                            ₹{item.price}
+                          </p>
+                          <div className="flex flex-col items-end gap-0.5">
+                            <label
+                              htmlFor={`avail-toggle-${item.id}`}
+                              className="flex items-center gap-1 cursor-pointer"
+                            >
+                              {/* Custom toggle switch */}
+                              <div className="relative">
+                                <input
+                                  id={`avail-toggle-${item.id}`}
+                                  type="checkbox"
+                                  checked={isAvailable}
+                                  onChange={() => toggleAvailability(item.id)}
+                                  data-ocid={`menu.availability.toggle.${idx + 1}`}
+                                  className="sr-only"
+                                />
+                                <div
+                                  className={`w-9 h-5 rounded-full transition-colors ${
+                                    isAvailable
+                                      ? "bg-orange-500"
+                                      : "bg-gray-300"
+                                  }`}
+                                >
+                                  <div
+                                    className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
+                                      isAvailable
+                                        ? "translate-x-4"
+                                        : "translate-x-0.5"
+                                    }`}
+                                  />
+                                </div>
+                              </div>
+                            </label>
+                            <span
+                              className={`text-xs font-medium ${
+                                isAvailable ? "text-green-600" : "text-red-500"
+                              }`}
+                            >
+                              {isAvailable ? "Available" : "Unavailable"}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <p className="font-bold text-green-600 text-base flex-shrink-0">
-                      ₹{item.price}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => openEditForm(item)}
-                      data-ocid={`menu.edit.edit_button.${idx + 1}`}
-                      className="w-9 h-9 rounded-xl flex items-center justify-center text-orange-400 hover:bg-orange-50 hover:text-orange-600 transition-colors flex-shrink-0"
-                      title="Edit item"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(item)}
-                      data-ocid={`menu.delete.delete_button.${idx + 1}`}
-                      className="w-9 h-9 rounded-xl flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 transition-colors flex-shrink-0"
-                      title="Delete item"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </>
