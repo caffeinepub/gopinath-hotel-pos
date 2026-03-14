@@ -10,12 +10,6 @@ import { Footer } from "../components/Footer";
 import { HeaderClock } from "../components/HeaderClock";
 import { QRCodeImage } from "../components/QRCodeImage";
 import { useActor } from "../hooks/useActor";
-import { isSupabaseConfigured } from "../lib/supabase";
-import {
-  insertPayment,
-  createOrder as supabaseCreateOrder,
-  updateOrderPaymentStatus,
-} from "../lib/supabaseApi";
 import type { CartItem, PaymentData } from "../types/payment";
 
 interface HotelSettingsProps {
@@ -125,14 +119,12 @@ export function PaymentScreen({
         try {
           let paymentConfirmed = false;
 
-          // Primary: use actor getPaymentStatus if we have an orderId
           if (currentActor && orderId !== null) {
             const status = await currentActor.getPaymentStatus(orderId);
             if (status === "paid" || status === "completed") {
               paymentConfirmed = true;
             }
           } else if (currentActor && txnId) {
-            // Fallback: check via checkPaymentStatus
             const result = await currentActor.checkPaymentStatus(
               txnId,
               BigInt(amt),
@@ -146,7 +138,6 @@ export function PaymentScreen({
           if (paymentConfirmed && !successFiredRef.current) {
             successFiredRef.current = true;
             clearPollingInterval();
-            // Confirm payment in actor
             if (currentActor && orderId !== null) {
               try {
                 await currentActor.confirmPayment(orderId);
@@ -170,7 +161,6 @@ export function PaymentScreen({
                 balance: 0,
                 cart: p.cart,
               };
-
               p.onPaymentComplete(data);
             }, 1500);
           }
@@ -189,7 +179,6 @@ export function PaymentScreen({
 
       if (currentActor) {
         try {
-          // Create order in actor
           const itemsJson = JSON.stringify(
             currentCart.map((c) => ({
               name: c.item.name,
@@ -204,7 +193,6 @@ export function PaymentScreen({
           );
           setCurrentOrderId(orderId);
 
-          // Start payment
           const returnedTxn = await currentActor.startPayment(
             orderId,
             BigInt(amt),
@@ -213,9 +201,10 @@ export function PaymentScreen({
           txnId = returnedTxn || txnId;
         } catch (e) {
           console.error("Actor createOrder/startPayment failed", e);
-          // Fallback: generate txn id
           try {
-            txnId = await currentActor.generateTransactionId();
+            if (currentActor) {
+              txnId = await currentActor.generateTransactionId();
+            }
           } catch {
             txnId = `txn_${Date.now()}`;
           }
@@ -269,7 +258,6 @@ export function PaymentScreen({
       cart,
     };
 
-    // Primary: use actor to create and confirm order
     if (actor) {
       try {
         const itemsJson = JSON.stringify(

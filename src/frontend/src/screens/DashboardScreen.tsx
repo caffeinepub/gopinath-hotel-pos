@@ -12,8 +12,6 @@ import type { Screen } from "../App";
 import { Footer } from "../components/Footer";
 import { HeaderClock } from "../components/HeaderClock";
 import { useActor } from "../hooks/useActor";
-import { useOrders } from "../hooks/useOrders";
-import { useSupabaseAnalytics } from "../hooks/useSupabaseAnalytics";
 
 interface DashboardScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -27,24 +25,26 @@ export function DashboardScreen({
   darkMode,
   loggedInUser = "Owner",
 }: DashboardScreenProps) {
-  const localOrders = useOrders();
-  const supabaseAnalytics = useSupabaseAnalytics();
   const { actor } = useActor();
 
-  const [actorAnalytics, setActorAnalytics] = useState<{
+  const [analytics, setAnalytics] = useState<{
     todaySales: number;
     totalOrders: number;
     topItem: string;
-  } | null>(null);
-  const [actorLoading, setActorLoading] = useState(false);
+  }>({
+    todaySales: 0,
+    totalOrders: 0,
+    topItem: "",
+  });
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
 
   useEffect(() => {
     if (!actor) return;
-    setActorLoading(true);
+    setAnalyticsLoading(true);
     actor
       .getAnalytics()
       .then((result) => {
-        setActorAnalytics({
+        setAnalytics({
           todaySales: Number(result.todaySales),
           totalOrders: Number(result.totalOrders),
           topItem: result.topItem ?? "",
@@ -54,43 +54,9 @@ export function DashboardScreen({
         console.error("Failed to fetch analytics from actor", e);
       })
       .finally(() => {
-        setActorLoading(false);
+        setAnalyticsLoading(false);
       });
   }, [actor]);
-
-  // Priority: actor > supabase > local
-  const isActorEnabled = !!actor;
-  const isSupabaseEnabled = supabaseAnalytics.isBackendEnabled;
-
-  const todaySales = isActorEnabled
-    ? (actorAnalytics?.todaySales ?? 0)
-    : isSupabaseEnabled
-      ? supabaseAnalytics.todaySales
-      : localOrders.todaySales;
-
-  const todayOrders = isActorEnabled
-    ? (actorAnalytics?.totalOrders ?? 0)
-    : isSupabaseEnabled
-      ? supabaseAnalytics.todayOrders
-      : localOrders.todayOrders;
-
-  const topItem = isActorEnabled
-    ? (actorAnalytics?.topItem ?? "")
-    : isSupabaseEnabled
-      ? supabaseAnalytics.topItem
-      : localOrders.topItem;
-
-  const analyticsLoading = isActorEnabled
-    ? actorLoading
-    : isSupabaseEnabled && supabaseAnalytics.loading;
-
-  const backendLabel = isActorEnabled
-    ? "ICP Backend"
-    : isSupabaseEnabled
-      ? "Supabase Connected"
-      : "Offline Mode";
-
-  const backendConnected = isActorEnabled || isSupabaseEnabled;
 
   const bg = darkMode ? "bg-gray-900" : "bg-gray-50";
   const cardBg = darkMode ? "bg-gray-800" : "bg-white";
@@ -137,7 +103,7 @@ export function DashboardScreen({
       </header>
 
       <div className="flex-1 flex flex-col px-5 gap-6 pt-6">
-        {/* TODAY'S ANALYTICS — first section */}
+        {/* TODAY'S ANALYTICS */}
         <div>
           <div className="flex items-center gap-3 mb-3">
             <p
@@ -145,23 +111,13 @@ export function DashboardScreen({
             >
               Today's Analytics
             </p>
-            {backendConnected ? (
-              <span
-                data-ocid="dashboard.backend_status.panel"
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                {backendLabel}
-              </span>
-            ) : (
-              <span
-                data-ocid="dashboard.backend_status.panel"
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-xs font-semibold"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
-                Offline Mode
-              </span>
-            )}
+            <span
+              data-ocid="dashboard.backend_status.panel"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+              ICP Backend
+            </span>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div
@@ -177,7 +133,7 @@ export function DashboardScreen({
                 Today's Sales
               </p>
               <p className={`text-xl font-bold ${text}`}>
-                ₹{todaySales.toLocaleString("en-IN")}
+                ₹{analytics.todaySales.toLocaleString("en-IN")}
               </p>
             </div>
 
@@ -191,7 +147,9 @@ export function DashboardScreen({
                 <ShoppingBag className="w-4 h-4 text-orange-500" />
               </div>
               <p className={`text-xs font-semibold ${subText}`}>Total Orders</p>
-              <p className={`text-xl font-bold ${text}`}>{todayOrders}</p>
+              <p className={`text-xl font-bold ${text}`}>
+                {analytics.totalOrders}
+              </p>
             </div>
 
             <div
@@ -205,13 +163,13 @@ export function DashboardScreen({
               </div>
               <p className={`text-xs font-semibold ${subText}`}>Top Item</p>
               <p className={`text-sm font-bold ${text} truncate`}>
-                {topItem || "N/A"}
+                {analytics.topItem || "N/A"}
               </p>
             </div>
           </div>
         </div>
 
-        {/* MODULE CARDS — below analytics */}
+        {/* MODULE CARDS */}
         <div>
           <p
             className={`text-xs font-semibold uppercase tracking-widest ${subText} mb-3`}

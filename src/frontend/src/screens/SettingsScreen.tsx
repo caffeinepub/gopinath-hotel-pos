@@ -7,11 +7,6 @@ import { HeaderClock } from "../components/HeaderClock";
 import { QRCodeImage } from "../components/QRCodeImage";
 import type { HotelSettings } from "../hooks/useSettings";
 import { useSettings } from "../hooks/useSettings";
-import {
-  getSupabaseConfig,
-  isSupabaseConfigured,
-  saveSupabaseConfig,
-} from "../lib/supabase";
 
 interface SettingsScreenProps {
   onBack: () => void;
@@ -27,10 +22,6 @@ export function SettingsScreen({
 }: SettingsScreenProps) {
   const { settings, saveSettings } = useSettings();
   const [form, setForm] = useState<HotelSettings>({ ...settings });
-
-  const [supabaseUrl, setSupabaseUrl] = useState(getSupabaseConfig().url);
-  const [supabaseKey, setSupabaseKey] = useState(getSupabaseConfig().key);
-  const [isConnected] = useState(isSupabaseConfigured);
 
   const bg = darkMode ? "bg-gray-900" : "bg-gray-50";
   const cardBg = darkMode ? "bg-gray-800" : "bg-white";
@@ -51,12 +42,12 @@ export function SettingsScreen({
   const upiIsValid = upiHasValue && UPI_REGEX.test(form.upiId.trim());
   const upiIsInvalid = upiHasValue && !UPI_REGEX.test(form.upiId.trim());
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (upiIsInvalid) {
       toast.error("Please fix the UPI ID before saving.");
       return;
     }
-    saveSettings(form);
+    await saveSettings(form);
     toast.success("Settings saved successfully");
   };
 
@@ -86,108 +77,26 @@ export function SettingsScreen({
       </header>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Backend Connection Section */}
+        {/* Backend Status */}
         <section className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 mb-3">
             <div className="w-7 h-7 rounded-lg bg-green-100 flex items-center justify-center">
               <Database className="w-4 h-4 text-green-600" />
             </div>
-            <h2 className={`font-bold text-base ${text}`}>
-              Backend Connection
-            </h2>
-            {isConnected ? (
-              <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-                Connected
-              </span>
-            ) : (
-              <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 text-xs font-semibold">
-                <span className="w-1.5 h-1.5 rounded-full bg-gray-400 inline-block" />
-                Not Connected
-              </span>
-            )}
+            <h2 className={`font-bold text-base ${text}`}>Backend</h2>
+            <span
+              data-ocid="settings.backend_status.panel"
+              className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+              ICP Backend
+            </span>
           </div>
-
-          <div
-            className={`${cardBg} rounded-2xl border ${border} p-4 md:p-6 space-y-4`}
-          >
+          <div className={`${cardBg} rounded-2xl border ${border} p-4`}>
             <p className={`text-sm ${subText}`}>
-              Enter your Supabase project credentials to enable database
-              storage, API calls, and realtime updates.
+              All data is stored on the Internet Computer blockchain. No
+              external database required.
             </p>
-
-            <div className="space-y-1">
-              <label
-                htmlFor="supabase-url"
-                className={`text-xs font-semibold uppercase tracking-wide ${subText}`}
-              >
-                Supabase Project URL
-              </label>
-              <input
-                id="supabase-url"
-                type="url"
-                value={supabaseUrl}
-                onChange={(e) => setSupabaseUrl(e.target.value)}
-                placeholder="https://xxxxxxxxxxxx.supabase.co"
-                data-ocid="settings.supabase_url.input"
-                className={`w-full h-12 px-4 rounded-xl border text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-colors ${inputCls}`}
-              />
-            </div>
-
-            <div className="space-y-1">
-              <label
-                htmlFor="supabase-key"
-                className={`text-xs font-semibold uppercase tracking-wide ${subText}`}
-              >
-                Supabase Anon Key
-              </label>
-              <input
-                id="supabase-key"
-                type="password"
-                value={supabaseKey}
-                onChange={(e) => setSupabaseKey(e.target.value)}
-                placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-                data-ocid="settings.supabase_key.input"
-                className={`w-full h-12 px-4 rounded-xl border text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-colors ${inputCls}`}
-              />
-            </div>
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  if (supabaseUrl && supabaseKey) {
-                    saveSupabaseConfig(supabaseUrl, supabaseKey);
-                  }
-                }}
-                disabled={!supabaseUrl || !supabaseKey}
-                data-ocid="settings.supabase_connect.primary_button"
-                className="px-6 py-2.5 rounded-xl bg-gradient-to-r from-green-500 to-green-600 text-white font-bold text-sm shadow-md hover:shadow-green-200 hover:scale-[1.02] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-              >
-                Connect &amp; Save
-              </button>
-              <p className={`text-xs ${subText}`}>
-                The page will reload to apply the connection.
-              </p>
-            </div>
-
-            <div className="rounded-xl bg-orange-50 border border-orange-100 p-3">
-              <p className="text-xs text-orange-700 font-semibold mb-1">
-                Setup Instructions
-              </p>
-              <ol className="text-xs text-orange-600 space-y-0.5 list-decimal list-inside">
-                <li>Create a free project at supabase.com</li>
-                <li>Go to Project Settings → API</li>
-                <li>Copy "Project URL" and "anon/public" key</li>
-                <li>
-                  Run the SQL schema from{" "}
-                  <code className="bg-orange-100 px-1 rounded">
-                    supabase-schema.sql
-                  </code>
-                </li>
-                <li>Paste credentials above and click Connect</li>
-              </ol>
-            </div>
           </div>
         </section>
 
@@ -258,6 +167,27 @@ export function SettingsScreen({
                     onChange={(e) => set("accountName", e.target.value)}
                     placeholder="Name on UPI account"
                     data-ocid="settings.account_name.input"
+                    className={`w-full h-12 px-4 rounded-xl border text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-colors ${inputCls}`}
+                  />
+                </div>
+
+                {/* GST % */}
+                <div className="space-y-1">
+                  <label
+                    htmlFor="settings-gst"
+                    className={`text-xs font-semibold uppercase tracking-wide ${subText}`}
+                  >
+                    Default GST %
+                  </label>
+                  <input
+                    id="settings-gst"
+                    type="number"
+                    value={form.defaultGstRate}
+                    onChange={(e) => set("defaultGstRate", e.target.value)}
+                    placeholder="e.g. 5"
+                    min="0"
+                    max="100"
+                    data-ocid="settings.gst_rate.input"
                     className={`w-full h-12 px-4 rounded-xl border text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-colors ${inputCls}`}
                   />
                 </div>

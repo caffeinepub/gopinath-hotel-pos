@@ -1,41 +1,71 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useActor } from "./useActor";
 
 export interface HotelSettings {
   hotelName: string;
-  address: string;
-  phone: string;
   upiId: string;
   accountName: string;
   defaultGstRate: string;
 }
 
-const SETTINGS_KEY = "pos_settings";
-
-const defaultSettings: HotelSettings = {
-  hotelName: "Gobinath Hotel",
-  address: "",
-  phone: "",
-  upiId: "",
-  accountName: "",
-  defaultGstRate: "18",
-};
-
-function loadSettings(): HotelSettings {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { ...defaultSettings, ...JSON.parse(raw) };
-  } catch {
-    // ignore
-  }
-  return defaultSettings;
+interface SettingsActor {
+  getSettings(): Promise<{
+    upiId: string;
+    accountName: string;
+    gstPercent: bigint;
+  }>;
+  saveSettings(
+    upiId: string,
+    accountName: string,
+    gstPercent: bigint,
+  ): Promise<void>;
 }
 
-export function useSettings() {
-  const [settings, setSettings] = useState<HotelSettings>(loadSettings);
+const defaultSettings: HotelSettings = {
+  hotelName: "Gopinath Hotel",
+  upiId: "sivakumaryuvaraj2000@okicici",
+  accountName: "Gopinath Hotel",
+  defaultGstRate: "5",
+};
 
-  const saveSettings = (next: HotelSettings) => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(next));
+export function useSettings() {
+  const [settings, setSettings] = useState<HotelSettings>(defaultSettings);
+  const { actor, isFetching } = useActor();
+
+  useEffect(() => {
+    if (!actor || isFetching) return;
+    const settingsActor = actor as unknown as SettingsActor;
+    settingsActor
+      .getSettings()
+      .then((result) => {
+        setSettings({
+          hotelName: "Gopinath Hotel",
+          upiId: result.upiId || defaultSettings.upiId,
+          accountName: result.accountName || defaultSettings.accountName,
+          defaultGstRate: result.gstPercent
+            ? result.gstPercent.toString()
+            : defaultSettings.defaultGstRate,
+        });
+      })
+      .catch((e) => {
+        console.error("Failed to load settings from canister", e);
+      });
+  }, [actor, isFetching]);
+
+  const saveSettings = async (next: HotelSettings) => {
     setSettings(next);
+    if (actor) {
+      try {
+        const settingsActor = actor as unknown as SettingsActor;
+        await settingsActor.saveSettings(
+          next.upiId,
+          next.accountName,
+          BigInt(Math.round(Number(next.defaultGstRate) || 0)),
+        );
+      } catch (e) {
+        console.error("Failed to save settings to canister", e);
+      }
+    }
   };
 
   return { settings, saveSettings };

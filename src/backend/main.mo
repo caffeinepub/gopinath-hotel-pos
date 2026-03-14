@@ -5,11 +5,11 @@ import Time "mo:core/Time";
 import Text "mo:core/Text";
 import Iter "mo:core/Iter";
 import OutCall "http-outcalls/outcall";
-import Migration "migration";
+
 import Array "mo:core/Array";
 import Runtime "mo:core/Runtime";
 
-(with migration = Migration.run)
+
 actor {
   type User = {
     id : Nat;
@@ -22,7 +22,7 @@ actor {
     id : Nat;
     name : Text;
     price : Nat;
-    category : Text; // veg, non_veg, drinks, etc.
+    category : Text;
     available : Bool;
     imageUrl : Text;
     createdAt : Int;
@@ -52,6 +52,12 @@ actor {
     topItem : ?Text;
   };
 
+  type Settings = {
+    upiId : Text;
+    accountName : Text;
+    gstPercent : Nat; // stored as integer percentage e.g. 5 = 5%
+  };
+
   type PaymentStatusResponse = {
     status : Text;
     message : Text;
@@ -63,6 +69,29 @@ actor {
   let payments = Map.empty<Nat, Payment>();
   var transactionCounter = 0;
   var paymentStatusUrl : ?Text = null;
+  var appSettings : Settings = {
+    upiId = "sivakumaryuvaraj2000@okicici";
+    accountName = "Gopinath Hotel";
+    gstPercent = 5;
+  };
+
+  // Seed initial data
+  do {
+    // Seed users
+    users.add(1, { id = 1; name = "Owner"; role = "owner"; pin = "1234" });
+    users.add(2, { id = 2; name = "Staff"; role = "staff"; pin = "5678" });
+
+    // Seed menu items
+    menuItems.add(1, { id = 1; name = "Paneer Butter Masala"; price = 180; category = "Veg"; available = true; imageUrl = ""; createdAt = Time.now() });
+    menuItems.add(2, { id = 2; name = "Dal Makhani"; price = 150; category = "Veg"; available = true; imageUrl = ""; createdAt = Time.now() });
+    menuItems.add(3, { id = 3; name = "Chicken Biryani"; price = 220; category = "Non-Veg"; available = true; imageUrl = ""; createdAt = Time.now() });
+    menuItems.add(4, { id = 4; name = "Butter Naan"; price = 40; category = "Veg"; available = true; imageUrl = ""; createdAt = Time.now() });
+    menuItems.add(5, { id = 5; name = "Mango Lassi"; price = 80; category = "Drinks"; available = true; imageUrl = ""; createdAt = Time.now() });
+    menuItems.add(6, { id = 6; name = "Samosa"; price = 30; category = "Snacks"; available = true; imageUrl = ""; createdAt = Time.now() });
+    menuItems.add(7, { id = 7; name = "Vanilla Scoop"; price = 60; category = "Ice Cream"; available = true; imageUrl = ""; createdAt = Time.now() });
+  };
+
+  // --- AUTH ---
 
   public shared ({ caller }) func login(pin : Text) : async (Text, Text) {
     let matchingUser = users.values().find(
@@ -77,6 +106,8 @@ actor {
       };
     };
   };
+
+  // --- MENU ---
 
   public query ({ caller }) func getMenu() : async [MenuItem] {
     menuItems.toArray().map(func((_, item)) { item });
@@ -156,6 +187,8 @@ actor {
     };
   };
 
+  // --- ORDERS ---
+
   public shared ({ caller }) func createOrder(
     itemsJson : Text,
     total : Nat,
@@ -184,6 +217,8 @@ actor {
       case (?order) { order };
     };
   };
+
+  // --- PAYMENTS ---
 
   public shared ({ caller }) func startPayment(
     orderId : Nat,
@@ -215,27 +250,38 @@ actor {
   };
 
   public shared ({ caller }) func confirmPayment(orderId : Nat) : async () {
+    // Update payment record
     let payment = payments.values().find(
       func(p) { p.orderId == orderId }
     );
     switch (payment) {
       case (null) { Runtime.trap("Payment not found") };
-      case (?_) {
-        let order = orders.get(orderId);
-        switch (order) {
-          case (null) { Runtime.trap("Order not found") };
-          case (?o) {
-            let updatedOrder : Order = {
-              id = o.id;
-              items = o.items;
-              total = o.total;
-              paymentMode = o.paymentMode;
-              paymentStatus = "completed";
-              createdAt = o.createdAt;
-            };
-            orders.add(orderId, updatedOrder);
-          };
+      case (?p) {
+        let updatedPayment : Payment = {
+          id = p.id;
+          orderId = p.orderId;
+          amount = p.amount;
+          status = "paid";
+          transactionId = p.transactionId;
+          createdAt = p.createdAt;
         };
+        payments.add(p.id, updatedPayment);
+      };
+    };
+    // Update order record
+    let order = orders.get(orderId);
+    switch (order) {
+      case (null) { Runtime.trap("Order not found") };
+      case (?o) {
+        let updatedOrder : Order = {
+          id = o.id;
+          items = o.items;
+          total = o.total;
+          paymentMode = o.paymentMode;
+          paymentStatus = "paid";
+          createdAt = o.createdAt;
+        };
+        orders.add(orderId, updatedOrder);
       };
     };
   };
@@ -246,6 +292,26 @@ actor {
     let id = timestamp.toText() # "_" # transactionCounter.toText();
     id;
   };
+
+  // --- SETTINGS ---
+
+  public query ({ caller }) func getSettings() : async Settings {
+    appSettings;
+  };
+
+  public shared ({ caller }) func saveSettings(
+    upiId : Text,
+    accountName : Text,
+    gstPercent : Nat,
+  ) : async () {
+    appSettings := {
+      upiId;
+      accountName;
+      gstPercent;
+    };
+  };
+
+  // --- PAYMENT GATEWAY (optional integration) ---
 
   public shared ({ caller }) func setPaymentStatusUrl(url : ?Text) : async () {
     paymentStatusUrl := url;
@@ -297,17 +363,20 @@ actor {
     };
   };
 
+  // --- ANALYTICS ---
+
   public query ({ caller }) func getAnalytics() : async Analytics {
-    let today = Time.now() / 1000000000 / 86400 * 86400 * 1000000000;
+    let today = Time.now() / 1_000_000_000 / 86400 * 86400 * 1_000_000_000;
     var todaySales = 0;
     var totalOrders = 0;
     let itemCounts = Map.empty<Text, Nat>();
 
     for ((_, order) in orders.entries()) {
-      if (order.createdAt >= today) {
+      if (order.createdAt >= today and (order.paymentStatus == "paid" or order.paymentStatus == "pending")) {
         todaySales += order.total;
         totalOrders += 1;
 
+        // Parse items to count individual item names
         let items = order.items;
         let count = switch (itemCounts.get(items)) {
           case (null) { 1 };
@@ -320,8 +389,7 @@ actor {
     var topItem : ?Text = null;
     var topCount = 0;
 
-    let itemCountsIter = itemCounts.entries();
-    for ((item, count) in itemCountsIter) {
+    for ((item, count) in itemCounts.entries()) {
       if (count > topCount) {
         topItem := ?item;
         topCount := count;

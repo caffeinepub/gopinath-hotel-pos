@@ -1,34 +1,31 @@
-# Gopinath Hotel POS — Full Stack Migration
+# Gopinath Hotel POS
 
 ## Current State
-The app uses Supabase for backend calls but requires manual credential entry in Settings. Without credentials it falls back to localStorage, meaning no API calls appear in the Network tab. The Motoko backend currently only handles payment status polling via HTTP outcalls.
+Full-stack ICP app with Motoko backend providing stable storage for users, menu_items, orders, payments, and analytics. Frontend React app uses canister API calls. All API calls are visible in the Network tab as ICP canister requests.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Motoko backend: stable storage for menu_items, orders, payments, users
-- Backend functions: login (PIN auth), getMenu, addMenuItem, updateMenuItem, deleteMenuItem, toggleAvailability, createOrder, getOrders, getOrder, startPayment, getPaymentStatus, getAnalytics
-- Frontend API layer (actorApi.ts) that wraps all actor calls
-- Frontend API calls visible in browser Network tab for every user action
+- Explicit `/api/*` style fetch wrapper in the frontend that routes all calls through a clean `api.ts` service layer
+- All screens must use this api service for: login, menu CRUD, order creation, payment start/status polling, analytics
+- QR payment: create order first, then generate QR, poll every 3 seconds for PAID status, auto-redirect to Print Bill
+- No manual cashier confirmation button on the payment screen
 
 ### Modify
-- MenuContext: use actor for all CRUD (add, edit, delete, toggle availability)
-- PaymentScreen: call actor createOrder on checkout, startPayment for QR, poll getPaymentStatus
-- DashboardScreen: call actor getAnalytics on mount
-- OwnerLoginScreen / StaffLoginScreen: call actor login for PIN verification
-- Remove Supabase dependency from data flow (keep lib files but no longer primary)
+- Frontend API calls must be explicit and readable (fetch to canister endpoints) so they show clearly in the Network tab
+- QR payment flow: 1) create order 2) generate QR with UPI link + amount 3) poll payment status every 3s 4) on PAID -> show green tick -> navigate to Print Bill
+- Dashboard analytics fetched from backend on load
+- Menu items fetched from backend (not localStorage)
+- Settings UPI ID persisted in backend
 
 ### Remove
-- localStorage-only fallback as primary data path (actor is always used)
-- Supabase as required config (it becomes optional/legacy)
+- Any remaining localStorage-only data paths
+- Supabase references
+- Manual payment confirmation button
 
 ## Implementation Plan
-1. Rewrite Motoko backend with stable var storage for all 5 data collections
-2. Expose login, menu CRUD, order creation, payment tracking, and analytics query functions
-3. Regenerate backend.d.ts to include new typed interfaces
-4. Create src/frontend/src/lib/actorApi.ts wrapping all actor methods
-5. Update MenuContext to call actorApi for all operations
-6. Update PaymentScreen to call actorApi.createOrder and actorApi.startPayment / pollPaymentStatus
-7. Update DashboardScreen to call actorApi.getAnalytics
-8. Update login screens to call actorApi.login
-9. Validate, build, and deploy
+1. Update Motoko backend to ensure all required endpoints exist: login, getMenu, addMenuItem, updateMenuItem, deleteMenuItem, toggleAvailability, createOrder, getOrders, getOrder, startPayment, getPaymentStatus, getAnalytics, saveSettings, getSettings
+2. Update frontend to use a centralized api.ts service calling canister methods
+3. Fix QR payment flow: createOrder -> startPayment -> poll getPaymentStatus every 3s -> PAID -> navigate
+4. Ensure all screens load data from backend on mount
+5. Validate and deploy

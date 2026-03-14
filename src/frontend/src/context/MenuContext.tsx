@@ -7,13 +7,6 @@ import {
 } from "react";
 import type { backendInterface } from "../backend";
 import { useActor } from "../hooks/useActor";
-import { isSupabaseConfigured } from "../lib/supabase";
-import {
-  fetchMenuItems,
-  insertMenuItem,
-  deleteMenuItem as supabaseDeleteMenuItem,
-  updateMenuItem as supabaseUpdateMenuItem,
-} from "../lib/supabaseApi";
 
 export type MenuCategory =
   | "Veg"
@@ -120,19 +113,6 @@ function loadFromLocalStorage(): MenuItem[] {
   return SAMPLE_ITEMS;
 }
 
-function mapSupabaseRow(row: Record<string, unknown>): MenuItem {
-  return {
-    id: row.id as string,
-    name: row.name as string,
-    price: row.price as number,
-    category: row.category as MenuCategory,
-    imageUrl:
-      (row.image_url as string) ||
-      `https://placehold.co/200x150/FF6B00/white?text=${encodeURIComponent((row.name as string).slice(0, 6))}`,
-    available: row.available !== false,
-  };
-}
-
 function mapActorMenuItem(item: {
   id: bigint;
   name: string;
@@ -157,10 +137,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<MenuItem[]>(loadFromLocalStorage);
   const [loading, setLoading] = useState(false);
   const { actor } = useActor();
-  const isSupabase = isSupabaseConfigured();
 
-  // actor is primary, supabase is secondary, localStorage is fallback
-  const isBackendEnabled = !!actor || isSupabase;
+  const isBackendEnabled = !!actor;
 
   const fetchFromActor = useCallback(async (currentActor: backendInterface) => {
     setLoading(true);
@@ -178,36 +156,11 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const fetchFromSupabase = useCallback(async () => {
-    if (!isSupabase) return;
-    setLoading(true);
-    try {
-      const rawData = await fetchMenuItems();
-      const data = Array.isArray(rawData)
-        ? (rawData as Record<string, unknown>[])
-        : null;
-      if (data && data.length > 0) {
-        const mapped = (data as Record<string, unknown>[]).map(mapSupabaseRow);
-        setItems(mapped);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
-      }
-    } catch (e) {
-      console.error(
-        "Failed to fetch menu from Supabase, using localStorage",
-        e,
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [isSupabase]);
-
   useEffect(() => {
     if (actor) {
       fetchFromActor(actor);
-    } else {
-      fetchFromSupabase();
     }
-  }, [actor, fetchFromActor, fetchFromSupabase]);
+  }, [actor, fetchFromActor]);
 
   // Sync to localStorage when using offline mode
   useEffect(() => {
@@ -232,21 +185,6 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         console.error("Actor addMenuItem failed, falling back", e);
       }
     }
-    if (isSupabase) {
-      try {
-        await insertMenuItem({
-          name: item.name,
-          price: item.price,
-          category: item.category,
-          available: item.available !== false,
-          image_url: item.imageUrl,
-        });
-        await fetchFromSupabase();
-        return;
-      } catch (e) {
-        console.error("Supabase insertMenuItem failed, falling back", e);
-      }
-    }
     setItems((prev) => [
       ...prev,
       { ...item, available: item.available !== false },
@@ -259,12 +197,6 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         await actor.deleteMenuItem(BigInt(id));
       } catch (e) {
         console.error("Actor deleteMenuItem failed", e);
-      }
-    } else if (isSupabase) {
-      try {
-        await supabaseDeleteMenuItem(id);
-      } catch (e) {
-        console.error("Supabase deleteMenuItem failed", e);
       }
     }
     setItems((prev) => prev.filter((item) => item.id !== id));
@@ -282,18 +214,6 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         );
       } catch (e) {
         console.error("Actor updateMenuItem failed", e);
-      }
-    } else if (isSupabase) {
-      try {
-        await supabaseUpdateMenuItem(updated.id, {
-          name: updated.name,
-          price: updated.price,
-          category: updated.category,
-          available: updated.available !== false,
-          image_url: updated.imageUrl,
-        });
-      } catch (e) {
-        console.error("Supabase updateMenuItem failed", e);
       }
     }
     setItems((prev) =>
@@ -313,12 +233,6 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         await actor.toggleAvailability(BigInt(id));
       } catch (e) {
         console.error("Actor toggleAvailability failed", e);
-      }
-    } else if (isSupabase) {
-      try {
-        await supabaseUpdateMenuItem(id, { available: newAvailable });
-      } catch (e) {
-        console.error("Supabase toggleAvailability failed", e);
       }
     }
     setItems((prev) =>

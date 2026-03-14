@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import type { Screen } from "../App";
 
+const LOGO_SRC = `${import.meta.env.BASE_URL}assets/uploads/modern-restaurant-logo-design-for-keeaap_FMTnl_lcRTG9KHviZ8Oxbw_iIsYXoF4R0OuTPt3-5QqLA_sd-1.jpeg`;
+
 interface AppSidebarProps {
   activeScreen: Screen;
   onNavigate: (screen: Screen) => void;
@@ -69,9 +71,13 @@ export function AppSidebar({
         className={`px-5 pt-5 pb-4 border-b ${divider} flex flex-col items-center gap-2`}
       >
         <img
-          src="/assets/uploads/modern-restaurant-logo-design-for-keeaap_FMTnl_lcRTG9KHviZ8Oxbw_iIsYXoF4R0OuTPt3-5QqLA_sd-1.jpeg"
+          src={LOGO_SRC}
           alt="Gopinath Hotel Logo"
           className="w-20 h-20 object-contain rounded-xl"
+          onError={(e) => {
+            const img = e.currentTarget;
+            img.style.display = "none";
+          }}
         />
         <p
           className={`font-bold text-sm leading-tight tracking-widest uppercase text-center ${brandText}`}

@@ -51,6 +51,11 @@ export interface PaymentStatusResponse {
     status: string;
     message: string;
 }
+export interface Settings {
+    upiId: string;
+    accountName: string;
+    gstPercent: bigint;
+}
 export interface backendInterface {
     addMenuItem(name: string, price: bigint, category: string, imageUrl: string): Promise<MenuItem>;
     checkPaymentStatus(transactionId: string, expectedAmount: bigint, upiId: string): Promise<PaymentStatusResponse>;
@@ -61,9 +66,11 @@ export interface backendInterface {
     getAnalytics(): Promise<Analytics>;
     getMenu(): Promise<Array<MenuItem>>;
     getOrder(id: bigint): Promise<Order>;
-    getOrders(): Promise<Array<Order>>;
+    getOrders(): Promise<Array<Order>>
     getPaymentStatus(orderId: bigint): Promise<string>;
+    getSettings(): Promise<Settings>;
     login(pin: string): Promise<[string, string]>;
+    saveSettings(upiId: string, accountName: string, gstPercent: bigint): Promise<void>;
     setPaymentStatusUrl(url: string | null): Promise<void>;
     startPayment(orderId: bigint, amount: bigint, upiId: string): Promise<string>;
     toggleAvailability(id: bigint): Promise<void>;
