@@ -1,8 +1,24 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title></title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="GH POS" />
+    <meta name="theme-color" content="#f97316" />
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="apple-touch-icon" href="./assets/generated/pwa-icon-512.dim_512x512.png" />
+    <title>Gopinath Hotel POS</title>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function() {
+          navigator.serviceWorker.register('./sw.js').catch(function(err) {
+            console.log('SW registration failed:', err);
+          });
+        });
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>

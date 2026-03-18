@@ -1,53 +1,82 @@
-import { Receipt, UtensilsCrossed } from "lucide-react";
+import {
+  LayoutDashboard,
+  LogOut,
+  Receipt,
+  Settings2,
+  UtensilsCrossed,
+} from "lucide-react";
 import type { Screen } from "../App";
 
 interface BottomNavProps {
-  activeScreen: "dashboard" | "billing" | "menuManagement";
+  activeScreen: Screen;
   onNavigate: (screen: Screen) => void;
+  onLogout: () => void;
   darkMode: boolean;
 }
+
+const navItems: { screen: Screen; label: string; icon: React.ReactNode }[] = [
+  {
+    screen: "dashboard",
+    label: "Home",
+    icon: <LayoutDashboard className="w-6 h-6" />,
+  },
+  {
+    screen: "billing",
+    label: "Bill",
+    icon: <Receipt className="w-6 h-6" />,
+  },
+  {
+    screen: "menuManagement",
+    label: "Menu",
+    icon: <UtensilsCrossed className="w-6 h-6" />,
+  },
+  {
+    screen: "settings",
+    label: "Settings",
+    icon: <Settings2 className="w-6 h-6" />,
+  },
+];
 
 export function BottomNav({
   activeScreen,
   onNavigate,
+  onLogout,
   darkMode,
 }: BottomNavProps) {
-  const tabs = [
-    { id: "billing" as const, label: "Bill", Icon: Receipt },
-    { id: "menuManagement" as const, label: "Menu", Icon: UtensilsCrossed },
-  ];
+  const bg = darkMode
+    ? "bg-gray-800 border-gray-700"
+    : "bg-white border-gray-200";
 
   return (
     <nav
-      data-ocid="bottomnav.panel"
-      className={`fixed bottom-0 left-0 right-0 z-50 h-16 flex items-center border-t ${
-        darkMode ? "bg-gray-900 border-gray-700" : "bg-white border-gray-100"
-      } shadow-lg`}
+      className={`fixed bottom-0 left-0 right-0 z-40 border-t ${bg} flex items-center justify-around px-1 py-1 lg:hidden`}
+      style={{ paddingBottom: "env(safe-area-inset-bottom, 8px)" }}
     >
-      {tabs.map(({ id, label, Icon }) => {
-        const isActive = activeScreen === id;
+      {navItems.map(({ screen, label, icon }) => {
+        const isActive = activeScreen === screen;
         return (
           <button
-            key={id}
+            key={label}
             type="button"
-            data-ocid={`bottomnav.${id === "billing" ? "bill" : "menu"}.tab`}
-            onClick={() => onNavigate(id)}
-            className={`flex-1 flex flex-col items-center justify-center h-full gap-0.5 transition-colors ${
+            onClick={() => onNavigate(screen)}
+            className={`flex flex-col items-center justify-center flex-1 py-2 gap-0.5 rounded-xl transition-all ${
               isActive
                 ? "text-orange-500"
                 : darkMode
-                  ? "text-gray-500"
-                  : "text-gray-400"
+                  ? "text-gray-400"
+                  : "text-gray-500"
             }`}
           >
-            <Icon className="w-5 h-5" />
             <span
-              className={`text-xs font-semibold ${
-                isActive
-                  ? "text-orange-500"
-                  : darkMode
-                    ? "text-gray-500"
-                    : "text-gray-400"
+              className={`p-1.5 rounded-xl transition-all ${
+                isActive ? "bg-orange-50" : ""
+              }`}
+            >
+              {icon}
+            </span>
+            <span
+              className={`text-[10px] font-semibold ${
+                isActive ? "text-orange-500" : ""
               }`}
             >
               {label}
@@ -55,6 +84,19 @@ export function BottomNav({
           </button>
         );
       })}
+      {/* Logout button */}
+      <button
+        type="button"
+        onClick={onLogout}
+        className={`flex flex-col items-center justify-center flex-1 py-2 gap-0.5 rounded-xl ${
+          darkMode ? "text-gray-400" : "text-gray-500"
+        }`}
+      >
+        <span className="p-1.5 rounded-xl">
+          <LogOut className="w-6 h-6" />
+        </span>
+        <span className="text-[10px] font-semibold">Logout</span>
+      </button>
     </nav>
   );
 }
