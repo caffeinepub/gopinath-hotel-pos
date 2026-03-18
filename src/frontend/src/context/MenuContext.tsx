@@ -1,12 +1,5 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
-import type { backendInterface } from "../backend";
-import { useActor } from "../hooks/useActor";
+import { createContext, useContext, useEffect, useState } from "react";
+import { api } from "../api";
 
 export type MenuCategory =
   | "Veg"
@@ -27,7 +20,6 @@ export interface MenuItem {
 interface MenuContextValue {
   items: MenuItem[];
   loading: boolean;
-  isBackendEnabled: boolean;
   addItem: (item: MenuItem) => void;
   deleteItem: (id: string) => void;
   updateItem: (item: MenuItem) => void;
@@ -97,7 +89,15 @@ const SAMPLE_ITEMS: MenuItem[] = [
 
 const STORAGE_KEY = "gopinath_menu_items";
 
-function loadFromLocalStorage(): MenuItem[] {
+function placeholderImage(name: string): string {
+  return `https://placehold.co/200x150/FF6B00/white?text=${encodeURIComponent(name.substring(0, 6))}`;
+}
+
+function persistToLS(items: MenuItem[]) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+}
+
+function loadFromLS(): MenuItem[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -113,133 +113,97 @@ function loadFromLocalStorage(): MenuItem[] {
   return SAMPLE_ITEMS;
 }
 
-function mapActorMenuItem(item: {
-  id: bigint;
-  name: string;
-  price: bigint;
-  category: string;
-  imageUrl: string;
-  available: boolean;
-}): MenuItem {
-  return {
-    id: item.id.toString(),
-    name: item.name,
-    price: Number(item.price),
-    category: item.category as MenuCategory,
-    imageUrl:
-      item.imageUrl ||
-      `https://placehold.co/200x150/FF6B00/white?text=${encodeURIComponent(item.name.slice(0, 6))}`,
-    available: item.available,
-  };
-}
-
 export function MenuProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<MenuItem[]>(loadFromLocalStorage);
+  const [items, setItems] = useState<MenuItem[]>(loadFromLS);
   const [loading, setLoading] = useState(false);
-  const { actor } = useActor();
 
-  const isBackendEnabled = !!actor;
-
-  const fetchFromActor = useCallback(async (currentActor: backendInterface) => {
+  // Load from canister on mount
+  useEffect(() => {
     setLoading(true);
-    try {
-      const data = await currentActor.getMenu();
-      if (data && data.length > 0) {
-        const mapped = data.map(mapActorMenuItem);
-        setItems(mapped);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
-      }
-    } catch (e) {
-      console.error("Failed to fetch menu from actor", e);
-    } finally {
-      setLoading(false);
-    }
+    api
+      .getMenu()
+      .then((remoteItems) => {
+        if (remoteItems.length > 0) {
+          const mapped: MenuItem[] = remoteItems.map((r) => ({
+            id: r.id,
+            name: r.name,
+            price: r.price,
+            category: r.category as MenuCategory,
+            available: r.available,
+            imageUrl: placeholderImage(r.name),
+          }));
+          setItems(mapped);
+          persistToLS(mapped);
+        }
+      })
+      .catch(() => {
+        // keep localStorage fallback
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    if (actor) {
-      fetchFromActor(actor);
-    }
-  }, [actor, fetchFromActor]);
-
-  // Sync to localStorage when using offline mode
-  useEffect(() => {
-    if (!isBackendEnabled) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
-    }
-  }, [items, isBackendEnabled]);
-
-  const addItem = async (item: MenuItem) => {
-    if (actor) {
-      try {
-        const result = await actor.addMenuItem(
-          item.name,
-          BigInt(item.price),
-          item.category,
-          item.imageUrl,
-        );
-        const mapped = mapActorMenuItem(result);
-        setItems((prev) => [...prev, mapped]);
-        return;
-      } catch (e) {
-        console.error("Actor addMenuItem failed, falling back", e);
-      }
-    }
-    setItems((prev) => [
-      ...prev,
-      { ...item, available: item.available !== false },
-    ]);
+  const addItem = (item: MenuItem) => {
+    const localItem: MenuItem = {
+      ...item,
+      available: item.available !== false,
+    };
+    setItems((prev) => {
+      const next = [...prev, localItem];
+      persistToLS(next);
+      return next;
+    });
+    // Persist to canister and replace temp id with canonical id
+    api
+      .addMenuItem(item.name, item.price, item.category)
+      .then((canonicalId) => {
+        setItems((prev) => {
+          const next = prev.map((i) =>
+            i.id === localItem.id ? { ...i, id: canonicalId } : i,
+          );
+          persistToLS(next);
+          return next;
+        });
+      })
+      .catch(() => {
+        // Keep local item as-is
+      });
   };
 
-  const deleteItem = async (id: string) => {
-    if (actor) {
-      try {
-        await actor.deleteMenuItem(BigInt(id));
-      } catch (e) {
-        console.error("Actor deleteMenuItem failed", e);
-      }
-    }
-    setItems((prev) => prev.filter((item) => item.id !== id));
+  const deleteItem = (id: string) => {
+    api.deleteMenuItem(id).catch(() => {});
+    setItems((prev) => {
+      const next = prev.filter((item) => item.id !== id);
+      persistToLS(next);
+      return next;
+    });
   };
 
-  const updateItem = async (updated: MenuItem) => {
-    if (actor) {
-      try {
-        await actor.updateMenuItem(
-          BigInt(updated.id),
-          updated.name,
-          BigInt(updated.price),
-          updated.category,
-          updated.imageUrl,
-        );
-      } catch (e) {
-        console.error("Actor updateMenuItem failed", e);
-      }
-    }
-    setItems((prev) =>
-      prev.map((item) =>
+  const updateItem = (updated: MenuItem) => {
+    api
+      .updateMenuItem(updated.id, updated.name, updated.price, updated.category)
+      .catch(() => {});
+    setItems((prev) => {
+      const next = prev.map((item) =>
         item.id === updated.id
           ? { ...updated, available: updated.available !== false }
           : item,
-      ),
-    );
+      );
+      persistToLS(next);
+      return next;
+    });
   };
 
-  const toggleAvailability = async (id: string) => {
-    const current = items.find((i) => i.id === id);
-    const newAvailable = !(current?.available !== false);
-    if (actor) {
-      try {
-        await actor.toggleAvailability(BigInt(id));
-      } catch (e) {
-        console.error("Actor toggleAvailability failed", e);
-      }
-    }
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, available: newAvailable } : item,
-      ),
-    );
+  const toggleAvailability = (id: string) => {
+    api.toggleAvailability(id).catch(() => {});
+    setItems((prev) => {
+      const next = prev.map((item) =>
+        item.id === id
+          ? { ...item, available: !(item.available !== false) }
+          : item,
+      );
+      persistToLS(next);
+      return next;
+    });
   };
 
   return (
@@ -247,7 +211,6 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       value={{
         items,
         loading,
-        isBackendEnabled,
         addItem,
         deleteItem,
         updateItem,

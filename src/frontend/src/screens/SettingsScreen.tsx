@@ -1,4 +1,4 @@
-import { Check, CreditCard, Database, Info, Settings2, X } from "lucide-react";
+import { Check, CreditCard, Info, Settings2, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { Screen } from "../App";
@@ -42,12 +42,12 @@ export function SettingsScreen({
   const upiIsValid = upiHasValue && UPI_REGEX.test(form.upiId.trim());
   const upiIsInvalid = upiHasValue && !UPI_REGEX.test(form.upiId.trim());
 
-  const handleSave = async () => {
+  const handleSave = () => {
     if (upiIsInvalid) {
       toast.error("Please fix the UPI ID before saving.");
       return;
     }
-    await saveSettings(form);
+    saveSettings(form);
     toast.success("Settings saved successfully");
   };
 
@@ -76,30 +76,7 @@ export function SettingsScreen({
         <div className="h-0.5 bg-gradient-to-r from-orange-500 to-orange-300 -mx-6" />
       </header>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {/* Backend Status */}
-        <section className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-7 h-7 rounded-lg bg-green-100 flex items-center justify-center">
-              <Database className="w-4 h-4 text-green-600" />
-            </div>
-            <h2 className={`font-bold text-base ${text}`}>Backend</h2>
-            <span
-              data-ocid="settings.backend_status.panel"
-              className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-              ICP Backend
-            </span>
-          </div>
-          <div className={`${cardBg} rounded-2xl border ${border} p-4`}>
-            <p className={`text-sm ${subText}`}>
-              All data is stored on the Internet Computer blockchain. No
-              external database required.
-            </p>
-          </div>
-        </section>
-
+      <div className="flex-1 overflow-y-auto p-4">
         {/* Payment Settings */}
         <section className="max-w-4xl mx-auto">
           <div className="flex items-center gap-2 mb-3">
@@ -110,6 +87,7 @@ export function SettingsScreen({
           </div>
 
           <div className={`${cardBg} rounded-2xl border ${border} p-4 md:p-6`}>
+            {/* Two-column on desktop: form left, QR right */}
             <div className="flex flex-col md:flex-row md:gap-8">
               {/* Form fields */}
               <div className="flex-1 space-y-4">
@@ -171,27 +149,7 @@ export function SettingsScreen({
                   />
                 </div>
 
-                {/* GST % */}
-                <div className="space-y-1">
-                  <label
-                    htmlFor="settings-gst"
-                    className={`text-xs font-semibold uppercase tracking-wide ${subText}`}
-                  >
-                    Default GST %
-                  </label>
-                  <input
-                    id="settings-gst"
-                    type="number"
-                    value={form.defaultGstRate}
-                    onChange={(e) => set("defaultGstRate", e.target.value)}
-                    placeholder="e.g. 5"
-                    min="0"
-                    max="100"
-                    data-ocid="settings.gst_rate.input"
-                    className={`w-full h-12 px-4 rounded-xl border text-sm outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 transition-colors ${inputCls}`}
-                  />
-                </div>
-
+                {/* Info hint when no UPI ID */}
                 {!upiHasValue && (
                   <div className="flex items-start gap-2 rounded-xl bg-orange-50 border border-orange-100 p-3">
                     <Info className="w-4 h-4 text-orange-400 mt-0.5 shrink-0" />
@@ -202,7 +160,7 @@ export function SettingsScreen({
                 )}
               </div>
 
-              {/* QR Preview */}
+              {/* QR Preview — only when UPI is valid */}
               {upiIsValid && (
                 <div className="mt-6 md:mt-0 md:w-56 flex flex-col items-center gap-3 bg-orange-50 rounded-2xl p-4 border border-orange-100">
                   <p className="text-xs font-bold uppercase tracking-wide text-orange-500">
@@ -225,6 +183,7 @@ export function SettingsScreen({
               )}
             </div>
 
+            {/* Save Button — centered, smaller */}
             <div className="mt-6 flex justify-center">
               <button
                 type="button"

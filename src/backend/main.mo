@@ -1,405 +1,233 @@
-import Map "mo:core/Map";
-import List "mo:core/List";
+import Array "mo:core/Array";
 import Nat "mo:core/Nat";
 import Time "mo:core/Time";
-import Text "mo:core/Text";
-import Iter "mo:core/Iter";
-import OutCall "http-outcalls/outcall";
-
-import Array "mo:core/Array";
-import Runtime "mo:core/Runtime";
-
+import Float "mo:core/Float";
 
 actor {
-  type User = {
-    id : Nat;
-    name : Text;
-    role : Text; // "owner" or "staff"
-    pin : Text;
-  };
+
+  // ─── TYPES ───────────────────────────────────────────────────────────────
 
   type MenuItem = {
-    id : Nat;
-    name : Text;
-    price : Nat;
-    category : Text;
+    id        : Text;
+    name      : Text;
+    price     : Float;
+    category  : Text;
     available : Bool;
-    imageUrl : Text;
-    createdAt : Int;
+  };
+
+  type OrderItem = {
+    itemId : Text;
+    name   : Text;
+    price  : Float;
+    qty    : Nat;
   };
 
   type Order = {
-    id : Nat;
-    items : Text; // JSON string of menu items
-    total : Nat;
-    paymentMode : Text;
-    paymentStatus : Text; // "pending", "paid", "failed"
-    createdAt : Int;
+    id            : Text;
+    items         : [OrderItem];
+    total         : Float;
+    paymentMode   : Text;
+    paymentStatus : Text;
+    createdAt     : Int;
   };
 
   type Payment = {
-    id : Nat;
-    orderId : Nat;
-    amount : Nat;
-    status : Text; // "pending", "paid", "failed"
+    id            : Text;
+    orderId       : Text;
+    amount        : Float;
+    status        : Text;
     transactionId : Text;
-    createdAt : Int;
-  };
-
-  type Analytics = {
-    todaySales : Nat;
-    totalOrders : Nat;
-    topItem : ?Text;
   };
 
   type Settings = {
-    upiId : Text;
+    upiId       : Text;
     accountName : Text;
-    gstPercent : Nat; // stored as integer percentage e.g. 5 = 5%
   };
 
-  type PaymentStatusResponse = {
-    status : Text;
-    message : Text;
+  type Analytics = {
+    todaySales  : Float;
+    todayOrders : Nat;
+    topItem     : Text;
   };
 
-  let users = Map.empty<Nat, User>();
-  let menuItems = Map.empty<Nat, MenuItem>();
-  let orders = Map.empty<Nat, Order>();
-  let payments = Map.empty<Nat, Payment>();
-  var transactionCounter = 0;
-  var paymentStatusUrl : ?Text = null;
-  var appSettings : Settings = {
-    upiId = "sivakumaryuvaraj2000@okicici";
-    accountName = "Gopinath Hotel";
-    gstPercent = 5;
+  // ─── STABLE STATE (persists across upgrades and refreshes) ───────────────
+
+  stable var menuItems : [MenuItem] = [];
+  stable var orders    : [Order]    = [];
+  stable var payments  : [Payment]  = [];
+  stable var settings  : Settings   = { upiId = ""; accountName = "" };
+  stable var nextId    : Nat        = 1;
+  stable var seeded    : Bool       = false;
+
+  // ─── SEED (only once, never resets) ──────────────────────────────────────
+
+  if (not seeded) {
+    menuItems := [
+      { id = "1"; name = "Paneer Butter Masala"; price = 180.0; category = "Veg";       available = true },
+      { id = "2"; name = "Chicken Biryani";      price = 250.0; category = "Non-Veg";   available = true },
+      { id = "3"; name = "Masala Chai";          price = 40.0;  category = "Drinks";    available = true },
+      { id = "4"; name = "Veg Spring Rolls";     price = 120.0; category = "Snacks";    available = true },
+      { id = "5"; name = "Mutton Curry";         price = 320.0; category = "Non-Veg";   available = true },
+      { id = "6"; name = "Mango Lassi";          price = 80.0;  category = "Drinks";    available = true },
+      { id = "7"; name = "Vanilla Ice Cream";    price = 60.0;  category = "Ice Cream"; available = true },
+    ];
+    nextId := 8;
+    seeded := true;
   };
 
-  // Seed initial data
-  do {
-    // Seed users
-    users.add(1, { id = 1; name = "Owner"; role = "owner"; pin = "1234" });
-    users.add(2, { id = 2; name = "Staff"; role = "staff"; pin = "5678" });
-
-    // Seed menu items
-    menuItems.add(1, { id = 1; name = "Paneer Butter Masala"; price = 180; category = "Veg"; available = true; imageUrl = ""; createdAt = Time.now() });
-    menuItems.add(2, { id = 2; name = "Dal Makhani"; price = 150; category = "Veg"; available = true; imageUrl = ""; createdAt = Time.now() });
-    menuItems.add(3, { id = 3; name = "Chicken Biryani"; price = 220; category = "Non-Veg"; available = true; imageUrl = ""; createdAt = Time.now() });
-    menuItems.add(4, { id = 4; name = "Butter Naan"; price = 40; category = "Veg"; available = true; imageUrl = ""; createdAt = Time.now() });
-    menuItems.add(5, { id = 5; name = "Mango Lassi"; price = 80; category = "Drinks"; available = true; imageUrl = ""; createdAt = Time.now() });
-    menuItems.add(6, { id = 6; name = "Samosa"; price = 30; category = "Snacks"; available = true; imageUrl = ""; createdAt = Time.now() });
-    menuItems.add(7, { id = 7; name = "Vanilla Scoop"; price = 60; category = "Ice Cream"; available = true; imageUrl = ""; createdAt = Time.now() });
+  func newId() : Text {
+    let id = nextId;
+    nextId += 1;
+    id.toText();
   };
 
-  // --- AUTH ---
+  // ─── MENU ─────────────────────────────────────────────────────────────────
 
-  public shared ({ caller }) func login(pin : Text) : async (Text, Text) {
-    let matchingUser = users.values().find(
-      func(user) {
-        user.pin == pin;
-      }
-    );
-    switch (matchingUser) {
-      case (null) { Runtime.trap("Invalid PIN") };
-      case (?user) {
-        (user.name, user.role);
-      };
-    };
+  public query func getMenu() : async [MenuItem] { menuItems };
+
+  public func addMenuItem(name : Text, price : Float, category : Text) : async Text {
+    let id = newId();
+    menuItems := menuItems.concat([{ id; name; price; category; available = true }]);
+    id;
   };
 
-  // --- MENU ---
-
-  public query ({ caller }) func getMenu() : async [MenuItem] {
-    menuItems.toArray().map(func((_, item)) { item });
+  public func updateMenuItem(id : Text, name : Text, price : Float, category : Text) : async Bool {
+    var found = false;
+    menuItems := menuItems.map(func(item : MenuItem) : MenuItem {
+      if (item.id == id) { found := true; { id; name; price; category; available = item.available } }
+      else item;
+    });
+    found;
   };
 
-  public shared ({ caller }) func addMenuItem(
-    name : Text,
-    price : Nat,
-    category : Text,
-    imageUrl : Text,
-  ) : async MenuItem {
-    let id = menuItems.size() + 1;
-    let newItem : MenuItem = {
-      id;
-      name;
-      price;
-      category;
-      available = true;
-      imageUrl;
-      createdAt = Time.now();
-    };
-    menuItems.add(id, newItem);
-    newItem;
+  public func deleteMenuItem(id : Text) : async Bool {
+    let before = menuItems.size();
+    menuItems := menuItems.filter(func(item : MenuItem) : Bool { item.id != id });
+    menuItems.size() < before;
   };
 
-  public shared ({ caller }) func updateMenuItem(
-    id : Nat,
-    name : Text,
-    price : Nat,
-    category : Text,
-    imageUrl : Text,
-  ) : async MenuItem {
-    let existingItem = menuItems.get(id);
-    switch (existingItem) {
-      case (null) { Runtime.trap("Item not found") };
-      case (?item) {
-        let updatedItem : MenuItem = {
-          id;
-          name;
-          price;
-          category;
-          available = item.available;
-          imageUrl;
-          createdAt = item.createdAt;
-        };
-        menuItems.add(id, updatedItem);
-        updatedItem;
-      };
-    };
+  public func toggleAvailability(id : Text) : async Bool {
+    var found = false;
+    menuItems := menuItems.map(func(item : MenuItem) : MenuItem {
+      if (item.id == id) {
+        found := true;
+        { id = item.id; name = item.name; price = item.price;
+          category = item.category; available = not item.available }
+      } else item;
+    });
+    found;
   };
 
-  public shared ({ caller }) func deleteMenuItem(id : Nat) : async () {
-    switch (menuItems.get(id)) {
-      case (null) { Runtime.trap("Item not found") };
-      case (?_) {
-        menuItems.remove(id);
-      };
-    };
-  };
+  // ─── ORDERS ───────────────────────────────────────────────────────────────
 
-  public shared ({ caller }) func toggleAvailability(id : Nat) : async () {
-    let item = menuItems.get(id);
-    switch (item) {
-      case (null) { Runtime.trap("Item not found") };
-      case (?menuItem) {
-        let updatedItem : MenuItem = {
-          id = menuItem.id;
-          name = menuItem.name;
-          price = menuItem.price;
-          category = menuItem.category;
-          available = not menuItem.available;
-          imageUrl = menuItem.imageUrl;
-          createdAt = menuItem.createdAt;
-        };
-        menuItems.add(id, updatedItem);
-      };
-    };
-  };
-
-  // --- ORDERS ---
-
-  public shared ({ caller }) func createOrder(
-    itemsJson : Text,
-    total : Nat,
-    paymentMode : Text,
-  ) : async Nat {
-    let id = orders.size() + 1;
-    let newOrder : Order = {
-      id;
-      items = itemsJson;
-      total;
-      paymentMode;
+  public func createOrder(items : [OrderItem], total : Float, paymentMode : Text) : async Text {
+    let id = newId();
+    orders := orders.concat([{
+      id; items; total; paymentMode;
       paymentStatus = "pending";
       createdAt = Time.now();
-    };
-    orders.add(id, newOrder);
+    }]);
     id;
   };
 
-  public query ({ caller }) func getOrders() : async [Order] {
-    orders.toArray().map(func((_, order)) { order });
+  public query func getOrders() : async [Order] { orders };
+
+  public query func getOrderById(id : Text) : async ?Order {
+    orders.find(func(o : Order) : Bool { o.id == id });
   };
 
-  public query ({ caller }) func getOrder(id : Nat) : async Order {
-    switch (orders.get(id)) {
-      case (null) { Runtime.trap("Order not found") };
-      case (?order) { order };
-    };
+  // ─── PAYMENTS ─────────────────────────────────────────────────────────────
+
+  public func startPayment(orderId : Text, amount : Float) : async Text {
+    let id = newId();
+    payments := payments.concat([{ id; orderId; amount; status = "pending"; transactionId = "" }]);
+    id;
   };
 
-  // --- PAYMENTS ---
-
-  public shared ({ caller }) func startPayment(
-    orderId : Nat,
-    amount : Nat,
-    upiId : Text,
-  ) : async Text {
-    let transactionId = await generateTransactionId();
-    let id = payments.size() + 1;
-    let newPayment : Payment = {
-      id;
-      orderId;
-      amount;
-      status = "pending";
-      transactionId;
-      createdAt = Time.now();
-    };
-    payments.add(id, newPayment);
-    transactionId;
-  };
-
-  public query ({ caller }) func getPaymentStatus(orderId : Nat) : async Text {
-    let payment = payments.values().find(
-      func(p) { p.orderId == orderId }
-    );
-    switch (payment) {
-      case (null) { "not found" };
+  public query func getPaymentStatus(orderId : Text) : async Text {
+    switch (payments.find(func(p : Payment) : Bool { p.orderId == orderId })) {
       case (?p) { p.status };
+      case null { "not_found" };
     };
   };
 
-  public shared ({ caller }) func confirmPayment(orderId : Nat) : async () {
-    // Update payment record
-    let payment = payments.values().find(
-      func(p) { p.orderId == orderId }
-    );
-    switch (payment) {
-      case (null) { Runtime.trap("Payment not found") };
-      case (?p) {
-        let updatedPayment : Payment = {
-          id = p.id;
-          orderId = p.orderId;
-          amount = p.amount;
-          status = "paid";
-          transactionId = p.transactionId;
-          createdAt = p.createdAt;
-        };
-        payments.add(p.id, updatedPayment);
-      };
-    };
-    // Update order record
-    let order = orders.get(orderId);
-    switch (order) {
-      case (null) { Runtime.trap("Order not found") };
-      case (?o) {
-        let updatedOrder : Order = {
-          id = o.id;
-          items = o.items;
-          total = o.total;
-          paymentMode = o.paymentMode;
-          paymentStatus = "paid";
-          createdAt = o.createdAt;
-        };
-        orders.add(orderId, updatedOrder);
-      };
-    };
+  public func confirmPayment(orderId : Text) : async Bool {
+    var found = false;
+    payments := payments.map(func(p : Payment) : Payment {
+      if (p.orderId == orderId) {
+        found := true;
+        { id = p.id; orderId = p.orderId; amount = p.amount;
+          status = "paid"; transactionId = "confirmed" }
+      } else p;
+    });
+    orders := orders.map(func(o : Order) : Order {
+      if (o.id == orderId) {
+        { id = o.id; items = o.items; total = o.total;
+          paymentMode = o.paymentMode; paymentStatus = "paid"; createdAt = o.createdAt }
+      } else o;
+    });
+    found;
   };
 
-  public shared ({ caller }) func generateTransactionId() : async Text {
-    let timestamp = Time.now();
-    transactionCounter += 1;
-    let id = timestamp.toText() # "_" # transactionCounter.toText();
-    id;
-  };
+  // ─── ANALYTICS ────────────────────────────────────────────────────────────
 
-  // --- SETTINGS ---
+  public query func getAnalytics() : async Analytics {
+    let oneDayNs : Int = 86_400_000_000_000;
+    let cutoff : Int = Time.now() - oneDayNs;
 
-  public query ({ caller }) func getSettings() : async Settings {
-    appSettings;
-  };
+    var sales : Float = 0.0;
+    var count : Nat = 0;
+    var topItemName : Text = "";
+    var topItemQty  : Nat  = 0;
 
-  public shared ({ caller }) func saveSettings(
-    upiId : Text,
-    accountName : Text,
-    gstPercent : Nat,
-  ) : async () {
-    appSettings := {
-      upiId;
-      accountName;
-      gstPercent;
-    };
-  };
+    var names : [Text] = [];
+    var qtys  : [Nat]  = [];
 
-  // --- PAYMENT GATEWAY (optional integration) ---
-
-  public shared ({ caller }) func setPaymentStatusUrl(url : ?Text) : async () {
-    paymentStatusUrl := url;
-  };
-
-  public query ({ caller }) func transform(input : OutCall.TransformationInput) : async OutCall.TransformationOutput {
-    OutCall.transform(input);
-  };
-
-  public shared ({ caller }) func checkPaymentStatus(
-    transactionId : Text,
-    expectedAmount : Nat,
-    upiId : Text,
-  ) : async PaymentStatusResponse {
-    switch (paymentStatusUrl) {
-      case (null) {
-        {
-          status = "pending";
-          message = "Gateway not configured";
-        };
-      };
-      case (?url) {
-        let requestUrl = url # "?transactionId=" # transactionId # "&amount=" # expectedAmount.toText() # "&upiId=" # upiId;
-        try {
-          let responseText = await OutCall.httpGetRequest(requestUrl, [], transform);
-          if (responseText.contains(#text "success")) {
-            {
-              status = "success";
-              message = "Payment successful";
-            };
-          } else if (responseText.contains(#text "failed")) {
-            {
-              status = "failed";
-              message = "Payment failed";
-            };
-          } else {
-            {
-              status = "pending";
-              message = "Payment pending";
-            };
+    for (o in orders.values()) {
+      if (o.createdAt >= cutoff and o.paymentStatus == "paid") {
+        sales += o.total;
+        count += 1;
+        for (oi in o.items.values()) {
+          var idx : ?Nat = null;
+          var i : Nat = 0;
+          for (n in names.values()) {
+            if (n == oi.name) { idx := ?i };
+            i += 1;
           };
-        } catch (e) {
-          {
-            status = "pending";
-            message = "HTTP outcall failed";
+          switch idx {
+            case (?j) {
+              qtys := qtys.mapEntries(func(q : Nat, k : Nat) : Nat {
+                if (k == j) q + oi.qty else q
+              });
+            };
+            case null {
+              names := names.concat([oi.name]);
+              qtys  := qtys.concat([oi.qty]);
+            };
           };
         };
       };
     };
+
+    var i : Nat = 0;
+    for (n in names.values()) {
+      if (qtys[i] > topItemQty) {
+        topItemQty  := qtys[i];
+        topItemName := n;
+      };
+      i += 1;
+    };
+
+    { todaySales = sales; todayOrders = count; topItem = topItemName };
   };
 
-  // --- ANALYTICS ---
+  // ─── SETTINGS ─────────────────────────────────────────────────────────────
 
-  public query ({ caller }) func getAnalytics() : async Analytics {
-    let today = Time.now() / 1_000_000_000 / 86400 * 86400 * 1_000_000_000;
-    var todaySales = 0;
-    var totalOrders = 0;
-    let itemCounts = Map.empty<Text, Nat>();
+  public query func getSettings() : async Settings { settings };
 
-    for ((_, order) in orders.entries()) {
-      if (order.createdAt >= today and (order.paymentStatus == "paid" or order.paymentStatus == "pending")) {
-        todaySales += order.total;
-        totalOrders += 1;
-
-        // Parse items to count individual item names
-        let items = order.items;
-        let count = switch (itemCounts.get(items)) {
-          case (null) { 1 };
-          case (?c) { c + 1 };
-        };
-        itemCounts.add(items, count);
-      };
-    };
-
-    var topItem : ?Text = null;
-    var topCount = 0;
-
-    for ((item, count) in itemCounts.entries()) {
-      if (count > topCount) {
-        topItem := ?item;
-        topCount := count;
-      };
-    };
-
-    {
-      todaySales;
-      totalOrders;
-      topItem;
-    };
+  public func saveSettings(upiId : Text, accountName : Text) : async Bool {
+    settings := { upiId; accountName };
+    true;
   };
+
 };

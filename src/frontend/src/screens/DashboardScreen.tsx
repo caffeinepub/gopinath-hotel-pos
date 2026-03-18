@@ -7,11 +7,10 @@ import {
   User,
   Utensils,
 } from "lucide-react";
-import { useEffect, useState } from "react";
 import type { Screen } from "../App";
 import { Footer } from "../components/Footer";
 import { HeaderClock } from "../components/HeaderClock";
-import { useActor } from "../hooks/useActor";
+import { useOrders } from "../hooks/useOrders";
 
 interface DashboardScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -25,38 +24,7 @@ export function DashboardScreen({
   darkMode,
   loggedInUser = "Owner",
 }: DashboardScreenProps) {
-  const { actor } = useActor();
-
-  const [analytics, setAnalytics] = useState<{
-    todaySales: number;
-    totalOrders: number;
-    topItem: string;
-  }>({
-    todaySales: 0,
-    totalOrders: 0,
-    topItem: "",
-  });
-  const [analyticsLoading, setAnalyticsLoading] = useState(false);
-
-  useEffect(() => {
-    if (!actor) return;
-    setAnalyticsLoading(true);
-    actor
-      .getAnalytics()
-      .then((result) => {
-        setAnalytics({
-          todaySales: Number(result.todaySales),
-          totalOrders: Number(result.totalOrders),
-          topItem: result.topItem ?? "",
-        });
-      })
-      .catch((e) => {
-        console.error("Failed to fetch analytics from actor", e);
-      })
-      .finally(() => {
-        setAnalyticsLoading(false);
-      });
-  }, [actor]);
+  const { todaySales, todayOrders, topItem } = useOrders();
 
   const bg = darkMode ? "bg-gray-900" : "bg-gray-50";
   const cardBg = darkMode ? "bg-gray-800" : "bg-white";
@@ -103,28 +71,17 @@ export function DashboardScreen({
       </header>
 
       <div className="flex-1 flex flex-col px-5 gap-6 pt-6">
-        {/* TODAY'S ANALYTICS */}
+        {/* TODAY'S ANALYTICS — first section */}
         <div>
-          <div className="flex items-center gap-3 mb-3">
-            <p
-              className={`text-xs font-semibold uppercase tracking-widest ${subText}`}
-            >
-              Today's Analytics
-            </p>
-            <span
-              data-ocid="dashboard.backend_status.panel"
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold"
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-              ICP Backend
-            </span>
-          </div>
+          <p
+            className={`text-xs font-semibold uppercase tracking-widest ${subText} mb-3`}
+          >
+            Today's Analytics
+          </p>
           <div className="grid grid-cols-3 gap-4">
             <div
               data-ocid="dashboard.sales.card"
-              className={`${cardBg} rounded-2xl border ${border} shadow-sm p-4 flex flex-col gap-2 transition-opacity ${
-                analyticsLoading ? "opacity-50" : "opacity-100"
-              }`}
+              className={`${cardBg} rounded-2xl border ${border} shadow-sm p-4 flex flex-col gap-2`}
             >
               <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center">
                 <TrendingUp className="w-4 h-4 text-orange-500" />
@@ -133,43 +90,37 @@ export function DashboardScreen({
                 Today's Sales
               </p>
               <p className={`text-xl font-bold ${text}`}>
-                ₹{analytics.todaySales.toLocaleString("en-IN")}
+                ₹{todaySales.toLocaleString("en-IN")}
               </p>
             </div>
 
             <div
               data-ocid="dashboard.orders.card"
-              className={`${cardBg} rounded-2xl border ${border} shadow-sm p-4 flex flex-col gap-2 transition-opacity ${
-                analyticsLoading ? "opacity-50" : "opacity-100"
-              }`}
+              className={`${cardBg} rounded-2xl border ${border} shadow-sm p-4 flex flex-col gap-2`}
             >
               <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center">
                 <ShoppingBag className="w-4 h-4 text-orange-500" />
               </div>
               <p className={`text-xs font-semibold ${subText}`}>Total Orders</p>
-              <p className={`text-xl font-bold ${text}`}>
-                {analytics.totalOrders}
-              </p>
+              <p className={`text-xl font-bold ${text}`}>{todayOrders}</p>
             </div>
 
             <div
               data-ocid="dashboard.topitem.card"
-              className={`${cardBg} rounded-2xl border ${border} shadow-sm p-4 flex flex-col gap-2 transition-opacity ${
-                analyticsLoading ? "opacity-50" : "opacity-100"
-              }`}
+              className={`${cardBg} rounded-2xl border ${border} shadow-sm p-4 flex flex-col gap-2`}
             >
               <div className="w-8 h-8 rounded-xl bg-orange-100 flex items-center justify-center">
                 <Utensils className="w-4 h-4 text-orange-500" />
               </div>
               <p className={`text-xs font-semibold ${subText}`}>Top Item</p>
               <p className={`text-sm font-bold ${text} truncate`}>
-                {analytics.topItem || "N/A"}
+                {topItem || "N/A"}
               </p>
             </div>
           </div>
         </div>
 
-        {/* MODULE CARDS */}
+        {/* MODULE CARDS — below analytics */}
         <div>
           <p
             className={`text-xs font-semibold uppercase tracking-widest ${subText} mb-3`}

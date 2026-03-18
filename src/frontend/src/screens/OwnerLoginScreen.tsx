@@ -4,7 +4,6 @@ import type { Screen } from "../App";
 import { BackButton } from "../components/BackButton";
 import { Footer } from "../components/Footer";
 import { PinKeypad } from "../components/PinKeypad";
-import { useActor } from "../hooks/useActor";
 
 interface OwnerLoginScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -18,58 +17,23 @@ export function OwnerLoginScreen({
   onLogin,
 }: OwnerLoginScreenProps) {
   const [pin, setPin] = useState("");
-  const { actor } = useActor();
 
   const handleKey = (k: string) => setPin((p) => (p.length < 4 ? p + k : p));
   const handleBackspace = () => setPin((p) => p.slice(0, -1));
   const handleClear = () => setPin("");
-  const handleSubmit = async () => {
+  const handleSubmit = () => {
     if (pin.length < 4) {
       toast.error("Please enter a 4-digit PIN");
       return;
     }
-
-    try {
-      if (actor) {
-        const [name, role] = await actor.login(pin);
-        if (role === "owner" || role === "Owner") {
-          toast.success("Owner login successful");
-          setPin("");
-          onLogin?.(name || "Owner");
-          onNavigate("dashboard");
-        } else if (role !== "") {
-          // Logged in but not as owner
-          toast.error("Access denied. Owner PIN required.");
-          setPin("");
-        } else {
-          toast.error("Incorrect PIN. Please try again.");
-          setPin("");
-        }
-      } else {
-        // Fallback: check hardcoded PIN
-        if (pin === OWNER_PIN) {
-          toast.success("Owner login successful");
-          setPin("");
-          onLogin?.("Owner");
-          onNavigate("dashboard");
-        } else {
-          toast.error("Incorrect PIN. Please try again.");
-          setPin("");
-        }
-      }
-    } catch (err) {
-      console.error("Login error", err);
-      // Fallback to hardcoded
-      if (pin === OWNER_PIN) {
-        toast.success("Owner login successful");
-        setPin("");
-        onLogin?.("Owner");
-        onNavigate("dashboard");
-      } else {
-        toast.error("Incorrect PIN. Please try again.");
-        setPin("");
-      }
-    } finally {
+    if (pin === OWNER_PIN) {
+      toast.success("Owner login successful");
+      setPin("");
+      onLogin?.("Owner");
+      onNavigate("dashboard");
+    } else {
+      toast.error("Incorrect PIN. Please try again.");
+      setPin("");
     }
   };
 

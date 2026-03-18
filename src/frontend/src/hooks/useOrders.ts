@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { api } from "../api";
 import type { PaymentData } from "../types/payment";
 
 function todayKey() {
@@ -6,7 +7,7 @@ function todayKey() {
   return `gopinath_orders_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function loadOrders(): PaymentData[] {
+function loadOrdersFromLS(): PaymentData[] {
   try {
     const raw = localStorage.getItem(todayKey());
     if (raw) return JSON.parse(raw) as PaymentData[];
@@ -16,23 +17,51 @@ function loadOrders(): PaymentData[] {
   return [];
 }
 
-function saveOrders(orders: PaymentData[]) {
+function saveOrdersToLS(orders: PaymentData[]) {
   localStorage.setItem(todayKey(), JSON.stringify(orders));
 }
 
 export function useOrders() {
-  const [orders, setOrders] = useState<PaymentData[]>(loadOrders);
+  const [orders, setOrders] = useState<PaymentData[]>(loadOrdersFromLS);
+  const [remoteSales, setRemoteSales] = useState<number | null>(null);
+  const [remoteOrders, setRemoteOrders] = useState<number | null>(null);
+  const [remoteTopItem, setRemoteTopItem] = useState<string | null>(null);
+
+  // Fetch analytics from canister
+  useEffect(() => {
+    api
+      .getAnalytics()
+      .then((analytics) => {
+        setRemoteSales(analytics.todaySales);
+        setRemoteOrders(Number(analytics.todayOrders));
+        setRemoteTopItem(analytics.topItem);
+      })
+      .catch(() => {
+        // fallback to local
+      });
+  }, []);
 
   const addOrder = (data: PaymentData) => {
     const next = [...orders, data];
-    saveOrders(next);
+    saveOrdersToLS(next);
     setOrders(next);
+    // Refresh analytics from canister after a short delay
+    setTimeout(() => {
+      api
+        .getAnalytics()
+        .then((analytics) => {
+          setRemoteSales(analytics.todaySales);
+          setRemoteOrders(Number(analytics.todayOrders));
+          setRemoteTopItem(analytics.topItem);
+        })
+        .catch(() => {});
+    }, 1500);
   };
 
-  const todaySales = orders.reduce((sum, o) => sum + o.total, 0);
-  const todayOrders = orders.length;
-
-  const topItem = (() => {
+  // Compute local fallbacks
+  const localSales = orders.reduce((sum, o) => sum + o.total, 0);
+  const localOrders = orders.length;
+  const localTopItem = (() => {
     const counts: Record<string, number> = {};
     for (const o of orders) {
       for (const c of o.cart) {
@@ -49,6 +78,10 @@ export function useOrders() {
     }
     return best;
   })();
+
+  const todaySales = remoteSales !== null ? remoteSales : localSales;
+  const todayOrders = remoteOrders !== null ? remoteOrders : localOrders;
+  const topItem = remoteTopItem !== null ? remoteTopItem : localTopItem;
 
   return { addOrder, todaySales, todayOrders, topItem };
 }
