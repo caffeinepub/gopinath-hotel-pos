@@ -1,30 +1,33 @@
-# Gopinath Hotel POS - Database Persistence Fix
+# Gopinath Hotel POS
 
 ## Current State
-- MenuContext uses localStorage as primary storage; canister is secondary
-- addItem assigns a temp ID locally, then replaces with canister ID -- causes mismatch on refresh
-- Orders stored only in localStorage by date key; canister analytics may not match
-- Dashboard analytics fetched from canister but may diverge from local state
+- Payment screen shows QR with UPI amount, auto-polls every 3s, auto-confirms after ~15s simulation
+- All users (Owner and Staff) see all nav items including Settings
+- No role-based access restrictions in navigation or screens
+- loggedInUser stored as string name only (no role)
 
 ## Requested Changes (Diff)
 
 ### Add
-- Loading spinner while canister data loads on mount
-- DB Status indicator (green/red dot) in header showing canister connectivity
+- Role tracking: save `userRole` ("owner" | "staff") in session alongside user name
+- Role-based nav: Settings item hidden in AppSidebar and BottomNav for staff role
+- Route guard: if staff tries to navigate to settings screen, redirect to dashboard
 
 ### Modify
-- MenuContext: canister is single source of truth. On mount, load from canister only. On add/edit/delete/toggle -- await canister call, then re-fetch full list from canister to sync UI. Remove localStorage as primary; keep only as loading cache.
-- useOrders: Remove localStorage order storage. Dashboard analytics always from canister getAnalytics(). addOrder triggers re-fetch of analytics after payment.
-- PaymentScreen: After cash/QR payment confirmed, call api.getAnalytics() to refresh dashboard.
+- Login flow: OwnerLoginScreen sets role "owner", StaffLoginScreen sets role "staff" when calling handleLogin
+- App.tsx handleLogin accepts role param, saves to state and session
+- AppSidebar: filter out Settings nav item when role is staff
+- BottomNav: filter out Settings nav item when role is staff
+- Payment screen QR: ensure bill amount is clearly displayed above QR code with total amount
+- Payment auto-confirm simulation: keep current 15s auto-confirm (no manual button)
 
 ### Remove
-- localStorage as primary data store for menu items
-- Temp ID pattern in addItem
-- localStorage order storage (STORAGE_KEY for orders by date)
+- Nothing removed
 
 ## Implementation Plan
-1. Rewrite MenuContext: canister-first, await all mutations, re-fetch after each mutation
-2. Rewrite useOrders: remove localStorage orders; analytics always from canister; expose refreshAnalytics
-3. Add DBStatusIndicator component (green dot = connected)
-4. Update DashboardScreen to show DB status
-5. Validate and deploy
+1. Update App.tsx: add `userRole` state ("owner"|"staff"), update session save/load, update handleLogin to accept role
+2. Update OwnerLoginScreen and StaffLoginScreen to pass role in onLogin callback
+3. Update AppSidebar: accept `userRole` prop, filter Settings from navItems for staff
+4. Update BottomNav: accept `userRole` prop, filter Settings for staff
+5. In App.tsx navigate function: if staff tries to go to settings, redirect to dashboard
+6. Payment screen: add clear amount display above QR code showing "Pay ₹{total}"

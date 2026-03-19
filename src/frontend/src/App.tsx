@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import type { Screen } from "./App.types";
 import { AppSidebar } from "./components/AppSidebar";
 import { BottomNav } from "./components/BottomNav";
@@ -25,7 +26,7 @@ export type { Screen };
 
 const SESSION_KEY = "pos_session";
 
-function loadSession(): { screen: Screen; user: string } | null {
+function loadSession(): { screen: Screen; user: string; role?: string } | null {
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
@@ -35,7 +36,7 @@ function loadSession(): { screen: Screen; user: string } | null {
   }
 }
 
-function saveSession(screen: Screen, user: string) {
+function saveSession(screen: Screen, user: string, role: "owner" | "staff") {
   const mainScreens: Screen[] = [
     "dashboard",
     "billing",
@@ -43,7 +44,7 @@ function saveSession(screen: Screen, user: string) {
     "settings",
   ];
   if (mainScreens.includes(screen) && user) {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({ screen, user }));
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ screen, user, role }));
   }
 }
 
@@ -60,12 +61,19 @@ export default function App() {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   const [loggedInUser, setLoggedInUser] = useState<string>(saved?.user ?? "");
+  const [userRole, setUserRole] = useState<"owner" | "staff">(
+    (saved?.role as "owner" | "staff") ?? "owner",
+  );
   const { settings } = useSettings();
   const { addOrder } = useOrders();
 
   const navigate = (next: Screen) => {
+    if (userRole === "staff" && next === "settings") {
+      toast.error("Access denied - Owner only");
+      return;
+    }
     setScreen(next);
-    saveSession(next, loggedInUser);
+    saveSession(next, loggedInUser, userRole);
   };
   const toggleDarkMode = () => setDarkMode((prev) => !prev);
 
@@ -78,20 +86,26 @@ export default function App() {
       "settings",
     ];
     if (mainScreens.includes(screen) && loggedInUser) {
-      saveSession(screen, loggedInUser);
+      saveSession(screen, loggedInUser, userRole);
     }
-  }, [screen, loggedInUser]);
+  }, [screen, loggedInUser, userRole]);
 
   const handleLogout = () => {
     clearSession();
     setScreen("loginSelect");
     setLoggedInUser("");
+    setUserRole("owner");
   };
 
-  const handleLogin = (user: string, nextScreen: Screen) => {
+  const handleLogin = (
+    user: string,
+    role: "owner" | "staff",
+    nextScreen: Screen,
+  ) => {
     setLoggedInUser(user);
+    setUserRole(role);
     setScreen(nextScreen);
-    saveSession(nextScreen, user);
+    saveSession(nextScreen, user, role);
   };
 
   const handleCheckout = (cart: CartItem[]) => {
@@ -146,13 +160,13 @@ export default function App() {
         {screen === "ownerLogin" && (
           <OwnerLoginScreen
             onNavigate={navigate}
-            onLogin={(user) => handleLogin(user, "dashboard")}
+            onLogin={(user, role) => handleLogin(user, role, "dashboard")}
           />
         )}
         {screen === "staffLogin" && (
           <StaffLoginScreen
             onNavigate={navigate}
-            onLogin={(user) => handleLogin(user, "dashboard")}
+            onLogin={(user, role) => handleLogin(user, role, "dashboard")}
           />
         )}
         {screen === "signUp" && <SignUpScreen onNavigate={navigate} />}
@@ -165,6 +179,7 @@ export default function App() {
               onNavigate={navigate}
               onLogout={handleLogout}
               darkMode={darkMode}
+              userRole={userRole}
             />
 
             {/* Mobile Top Header - visible only on mobile */}
@@ -215,6 +230,7 @@ export default function App() {
               onNavigate={navigate}
               onLogout={handleLogout}
               darkMode={darkMode}
+              userRole={userRole}
             />
           </div>
         )}

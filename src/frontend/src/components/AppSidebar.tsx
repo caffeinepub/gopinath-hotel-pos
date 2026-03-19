@@ -14,13 +14,15 @@ interface AppSidebarProps {
   onNavigate: (screen: Screen) => void;
   onLogout: () => void;
   darkMode: boolean;
+  userRole: "owner" | "staff";
 }
 
-const navItems: {
+const allNavItems: {
   screen: Screen;
   label: string;
   icon: React.ReactNode;
   ocid: string;
+  ownerOnly?: boolean;
 }[] = [
   {
     screen: "dashboard",
@@ -45,6 +47,7 @@ const navItems: {
     label: "Settings",
     icon: <Settings2 className="w-5 h-5" />,
     ocid: "sidebar.settings.link",
+    ownerOnly: true,
   },
 ];
 
@@ -53,6 +56,7 @@ export function AppSidebar({
   onNavigate,
   onLogout,
   darkMode,
+  userRole,
 }: AppSidebarProps) {
   const panelBg = darkMode ? "bg-gray-800" : "bg-white";
   const brandText = darkMode ? "text-white" : "text-gray-900";
@@ -60,6 +64,10 @@ export function AppSidebar({
   const borderRight = darkMode
     ? "border-r border-gray-700"
     : "border-r border-gray-200";
+
+  const navItems = allNavItems.filter(
+    (item) => !(item.ownerOnly && userRole === "staff"),
+  );
 
   return (
     <aside

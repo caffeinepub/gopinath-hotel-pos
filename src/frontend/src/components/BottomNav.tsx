@@ -12,9 +12,15 @@ interface BottomNavProps {
   onNavigate: (screen: Screen) => void;
   onLogout: () => void;
   darkMode: boolean;
+  userRole: "owner" | "staff";
 }
 
-const navItems: { screen: Screen; label: string; icon: React.ReactNode }[] = [
+const allNavItems: {
+  screen: Screen;
+  label: string;
+  icon: React.ReactNode;
+  ownerOnly?: boolean;
+}[] = [
   {
     screen: "dashboard",
     label: "Home",
@@ -34,6 +40,7 @@ const navItems: { screen: Screen; label: string; icon: React.ReactNode }[] = [
     screen: "settings",
     label: "Settings",
     icon: <Settings2 className="w-6 h-6" />,
+    ownerOnly: true,
   },
 ];
 
@@ -42,10 +49,15 @@ export function BottomNav({
   onNavigate,
   onLogout,
   darkMode,
+  userRole,
 }: BottomNavProps) {
   const bg = darkMode
     ? "bg-gray-800 border-gray-700"
     : "bg-white border-gray-200";
+
+  const navItems = allNavItems.filter(
+    (item) => !(item.ownerOnly && userRole === "staff"),
+  );
 
   return (
     <nav

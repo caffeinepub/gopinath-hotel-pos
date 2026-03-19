@@ -7,7 +7,7 @@ import { PinKeypad } from "../components/PinKeypad";
 
 interface StaffLoginScreenProps {
   onNavigate: (screen: Screen) => void;
-  onLogin?: (user: string) => void;
+  onLogin?: (user: string, role: "owner" | "staff") => void;
 }
 
 const STAFF_PIN = "5678";
@@ -30,7 +30,7 @@ export function StaffLoginScreen({
     if (pin === STAFF_PIN) {
       toast.success("Staff login successful");
       setPin("");
-      onLogin?.("Staff");
+      onLogin?.("Staff", "staff");
       onNavigate("dashboard");
     } else {
       toast.error("Incorrect PIN. Please try again.");

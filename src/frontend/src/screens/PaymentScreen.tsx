@@ -534,6 +534,13 @@ export function PaymentScreen({
               </div>
             ) : (
               <div className="flex flex-col items-center gap-4 py-2">
+                {/* Amount display above QR */}
+                <div className="text-center">
+                  <p className="text-sm text-gray-500">Amount to Pay</p>
+                  <p className="text-3xl font-extrabold text-green-600">
+                    &#8377;{total}
+                  </p>
+                </div>
                 <div className="p-3 bg-white rounded-2xl shadow-sm border border-gray-100">
                   <QRCodeImage value={upiQrValue} size={180} />
                 </div>
