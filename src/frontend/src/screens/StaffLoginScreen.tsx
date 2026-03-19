@@ -11,6 +11,7 @@ interface StaffLoginScreenProps {
 }
 
 const STAFF_PIN = "5678";
+const LOGO_PATH = `${import.meta.env.BASE_URL}assets/uploads/homeScreenLogo-1.jpeg`;
 
 export function StaffLoginScreen({
   onNavigate,
@@ -46,7 +47,26 @@ export function StaffLoginScreen({
         />
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center gap-8 py-6">
+      <div className="flex-1 flex flex-col items-center justify-center gap-6 py-6">
+        {/* Hotel Logo */}
+        <div className="flex flex-col items-center gap-3 animate-scale-in">
+          <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-lg border-2 border-orange-100">
+            <img
+              src={LOGO_PATH}
+              alt="Gopinath Hotel"
+              className="w-full h-full object-contain"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          </div>
+          <div className="text-center">
+            <p className="font-bold text-sm text-orange-500 uppercase tracking-widest">
+              Gopinath Hotel
+            </p>
+          </div>
+        </div>
+
         <div className="w-full flex flex-col items-center gap-6 animate-scale-in">
           <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground text-center">
             Staff Login

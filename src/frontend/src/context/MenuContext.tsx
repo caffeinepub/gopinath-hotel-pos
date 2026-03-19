@@ -85,30 +85,37 @@ function loadCacheFromLS(): MenuItem[] {
 }
 
 export function MenuProvider({ children }: { children: React.ReactNode }) {
-  // Start with cached data for fast initial render, but always refetch from canister
-  const [items, setItems] = useState<MenuItem[]>(loadCacheFromLS);
+  const [items, setItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [mutating, setMutating] = useState(false);
 
   const fetchFromCanister = useCallback(async () => {
-    try {
-      const remoteItems = await api.getMenu();
-      const mapped = remoteItems.map(mapRemoteItem);
+    console.log("[MenuContext] Fetching menu from canister...");
+    // getMenu throws on error -- don't catch here
+    const remoteItems = await api.getMenuRaw();
+    console.log("[MenuContext] Menu fetched:", remoteItems.length, "items");
+    const mapped = remoteItems.map(mapRemoteItem);
+    // Only update cache/state if we got real data (avoid overwriting with empty on error)
+    if (mapped.length >= 0) {
       setItems(mapped);
-      persistToLS(mapped);
-      return mapped;
-    } catch (e) {
-      console.error("[MenuContext] getMenu failed", e);
-      throw e;
+      if (mapped.length > 0) {
+        persistToLS(mapped);
+      }
     }
+    return mapped;
   }, []);
 
-  // On mount: always load from canister (single source of truth)
+  // On mount: show cached data immediately, then always load from canister
   useEffect(() => {
+    const cached = loadCacheFromLS();
+    if (cached.length > 0) {
+      setItems(cached);
+    }
     setLoading(true);
     fetchFromCanister()
-      .catch(() => {
-        // keep cached data as fallback
+      .catch((e) => {
+        console.error("[MenuContext] getMenu failed, keeping cached data", e);
+        // keep cached data as fallback -- do NOT clear it
       })
       .finally(() => setLoading(false));
   }, [fetchFromCanister]);
@@ -116,7 +123,10 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const addItem = async (item: Omit<MenuItem, "id">) => {
     setMutating(true);
     try {
-      await api.addMenuItem(item.name, item.price, item.category);
+      console.log("[MenuContext] Adding menu item:", item.name);
+      const newId = await api.addMenuItem(item.name, item.price, item.category);
+      console.log("[MenuContext] Item added with id:", newId);
+      // Refetch from canister to confirm save
       await fetchFromCanister();
       toast.success(`"${item.name}" added to menu!`);
     } catch (e) {
@@ -132,7 +142,9 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     const item = items.find((i) => i.id === id);
     setMutating(true);
     try {
+      console.log("[MenuContext] Deleting menu item:", id);
       await api.deleteMenuItem(id);
+      console.log("[MenuContext] Item deleted:", id);
       await fetchFromCanister();
       toast.success(`"${item?.name ?? "Item"}" removed from menu.`);
     } catch (e) {
@@ -147,12 +159,14 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const updateItem = async (updated: MenuItem) => {
     setMutating(true);
     try {
+      console.log("[MenuContext] Updating menu item:", updated.id);
       await api.updateMenuItem(
         updated.id,
         updated.name,
         updated.price,
         updated.category,
       );
+      console.log("[MenuContext] Item updated:", updated.id);
       await fetchFromCanister();
       toast.success(`"${updated.name}" updated!`);
     } catch (e) {
@@ -167,7 +181,9 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
   const toggleAvailability = async (id: string) => {
     setMutating(true);
     try {
+      console.log("[MenuContext] Toggling availability:", id);
       await api.toggleAvailability(id);
+      console.log("[MenuContext] Availability toggled:", id);
       await fetchFromCanister();
     } catch (e) {
       console.error("[MenuContext] toggleAvailability failed", e);
