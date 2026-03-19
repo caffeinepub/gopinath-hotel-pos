@@ -1,31 +1,30 @@
-# Gopinath Hotel POS
+# Gopinath Hotel POS - Database Persistence Fix
 
 ## Current State
-Full-stack ICP app with Motoko backend providing stable storage for users, menu_items, orders, payments, and analytics. Frontend React app uses canister API calls. All API calls are visible in the Network tab as ICP canister requests.
+- MenuContext uses localStorage as primary storage; canister is secondary
+- addItem assigns a temp ID locally, then replaces with canister ID -- causes mismatch on refresh
+- Orders stored only in localStorage by date key; canister analytics may not match
+- Dashboard analytics fetched from canister but may diverge from local state
 
 ## Requested Changes (Diff)
 
 ### Add
-- Explicit `/api/*` style fetch wrapper in the frontend that routes all calls through a clean `api.ts` service layer
-- All screens must use this api service for: login, menu CRUD, order creation, payment start/status polling, analytics
-- QR payment: create order first, then generate QR, poll every 3 seconds for PAID status, auto-redirect to Print Bill
-- No manual cashier confirmation button on the payment screen
+- Loading spinner while canister data loads on mount
+- DB Status indicator (green/red dot) in header showing canister connectivity
 
 ### Modify
-- Frontend API calls must be explicit and readable (fetch to canister endpoints) so they show clearly in the Network tab
-- QR payment flow: 1) create order 2) generate QR with UPI link + amount 3) poll payment status every 3s 4) on PAID -> show green tick -> navigate to Print Bill
-- Dashboard analytics fetched from backend on load
-- Menu items fetched from backend (not localStorage)
-- Settings UPI ID persisted in backend
+- MenuContext: canister is single source of truth. On mount, load from canister only. On add/edit/delete/toggle -- await canister call, then re-fetch full list from canister to sync UI. Remove localStorage as primary; keep only as loading cache.
+- useOrders: Remove localStorage order storage. Dashboard analytics always from canister getAnalytics(). addOrder triggers re-fetch of analytics after payment.
+- PaymentScreen: After cash/QR payment confirmed, call api.getAnalytics() to refresh dashboard.
 
 ### Remove
-- Any remaining localStorage-only data paths
-- Supabase references
-- Manual payment confirmation button
+- localStorage as primary data store for menu items
+- Temp ID pattern in addItem
+- localStorage order storage (STORAGE_KEY for orders by date)
 
 ## Implementation Plan
-1. Update Motoko backend to ensure all required endpoints exist: login, getMenu, addMenuItem, updateMenuItem, deleteMenuItem, toggleAvailability, createOrder, getOrders, getOrder, startPayment, getPaymentStatus, getAnalytics, saveSettings, getSettings
-2. Update frontend to use a centralized api.ts service calling canister methods
-3. Fix QR payment flow: createOrder -> startPayment -> poll getPaymentStatus every 3s -> PAID -> navigate
-4. Ensure all screens load data from backend on mount
+1. Rewrite MenuContext: canister-first, await all mutations, re-fetch after each mutation
+2. Rewrite useOrders: remove localStorage orders; analytics always from canister; expose refreshAnalytics
+3. Add DBStatusIndicator component (green dot = connected)
+4. Update DashboardScreen to show DB status
 5. Validate and deploy

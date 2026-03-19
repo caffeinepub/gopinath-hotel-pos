@@ -16,6 +16,7 @@ import { PaymentScreen } from "./screens/PaymentScreen";
 import { PrintBillScreen } from "./screens/PrintBillScreen";
 import { SettingsScreen } from "./screens/SettingsScreen";
 import { SignUpScreen } from "./screens/SignUpScreen";
+import { SplashScreen } from "./screens/SplashScreen";
 import { StaffLoginScreen } from "./screens/StaffLoginScreen";
 import { WelcomeScreen } from "./screens/WelcomeScreen";
 import type { CartItem, PaymentData } from "./types/payment";
@@ -52,13 +53,13 @@ function clearSession() {
 
 export default function App() {
   const saved = loadSession();
-  const [screen, setScreen] = useState<Screen>(saved?.screen ?? "welcome");
+  // Always show splash on every app open (not just first time)
+  const [showSplash, setShowSplash] = useState(true);
+  const [screen, setScreen] = useState<Screen>(saved?.screen ?? "loginSelect");
   const [darkMode, setDarkMode] = useState(false);
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
-  const [loggedInUser, setLoggedInUser] = useState<string>(
-    saved?.user ?? "Owner",
-  );
+  const [loggedInUser, setLoggedInUser] = useState<string>(saved?.user ?? "");
   const { settings } = useSettings();
   const { addOrder } = useOrders();
 
@@ -104,6 +105,10 @@ export default function App() {
     setScreen("printBill");
   };
 
+  const handleSplashComplete = () => {
+    setShowSplash(false);
+  };
+
   const isMainApp =
     screen === "dashboard" ||
     screen === "billing" ||
@@ -117,6 +122,11 @@ export default function App() {
     upiId: settings.upiId,
     accountName: settings.accountName,
   };
+
+  // Show splash screen on app open
+  if (showSplash) {
+    return <SplashScreen onComplete={handleSplashComplete} />;
+  }
 
   return (
     <MenuProvider>

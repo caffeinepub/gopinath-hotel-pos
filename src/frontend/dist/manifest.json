@@ -1,6 +1,6 @@
 {
-  "name": "Gopinath Hotel POS",
-  "short_name": "GH POS",
+  "name": "Gopinath Hotel",
+  "short_name": "Gopinath Hotel",
   "description": "Gopinath Hotel Point of Sale System",
   "start_url": "./",
   "scope": "./",
@@ -13,13 +13,19 @@
       "src": "./assets/generated/pwa-icon-512.dim_512x512.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
       "src": "./assets/generated/pwa-icon-512.dim_512x512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "./assets/generated/pwa-icon-512.dim_512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ]
 }

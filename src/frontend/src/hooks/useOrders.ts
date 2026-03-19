@@ -1,87 +1,61 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { api } from "../api";
 import type { PaymentData } from "../types/payment";
 
-function todayKey() {
-  const d = new Date();
-  return `gopinath_orders_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function loadOrdersFromLS(): PaymentData[] {
-  try {
-    const raw = localStorage.getItem(todayKey());
-    if (raw) return JSON.parse(raw) as PaymentData[];
-  } catch {
-    // ignore
-  }
-  return [];
-}
-
-function saveOrdersToLS(orders: PaymentData[]) {
-  localStorage.setItem(todayKey(), JSON.stringify(orders));
+interface AnalyticsState {
+  todaySales: number;
+  todayOrders: number;
+  topItem: string;
+  dbConnected: boolean;
+  loading: boolean;
 }
 
 export function useOrders() {
-  const [orders, setOrders] = useState<PaymentData[]>(loadOrdersFromLS);
-  const [remoteSales, setRemoteSales] = useState<number | null>(null);
-  const [remoteOrders, setRemoteOrders] = useState<number | null>(null);
-  const [remoteTopItem, setRemoteTopItem] = useState<string | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsState>({
+    todaySales: 0,
+    todayOrders: 0,
+    topItem: "",
+    dbConnected: false,
+    loading: true,
+  });
 
-  // Fetch analytics from canister
-  useEffect(() => {
-    api
-      .getAnalytics()
-      .then((analytics) => {
-        setRemoteSales(analytics.todaySales);
-        setRemoteOrders(Number(analytics.todayOrders));
-        setRemoteTopItem(analytics.topItem);
-      })
-      .catch(() => {
-        // fallback to local
+  const refreshAnalytics = useCallback(async () => {
+    try {
+      const data = await api.getAnalytics();
+      setAnalytics({
+        todaySales: data.todaySales,
+        todayOrders: Number(data.todayOrders),
+        topItem: data.topItem,
+        dbConnected: true,
+        loading: false,
       });
+    } catch (e) {
+      console.error("[useOrders] getAnalytics failed", e);
+      setAnalytics((prev) => ({ ...prev, dbConnected: false, loading: false }));
+    }
   }, []);
 
-  const addOrder = (data: PaymentData) => {
-    const next = [...orders, data];
-    saveOrdersToLS(next);
-    setOrders(next);
-    // Refresh analytics from canister after a short delay
+  // Load analytics from canister on mount
+  useEffect(() => {
+    refreshAnalytics();
+  }, [refreshAnalytics]);
+
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const addOrder = (_data: PaymentData) => {
+    // Session-only: paymentData is passed directly to PrintBillScreen via App state
+    // Refresh analytics from canister after short delay (allow canister to process)
     setTimeout(() => {
-      api
-        .getAnalytics()
-        .then((analytics) => {
-          setRemoteSales(analytics.todaySales);
-          setRemoteOrders(Number(analytics.todayOrders));
-          setRemoteTopItem(analytics.topItem);
-        })
-        .catch(() => {});
+      refreshAnalytics();
     }, 1500);
   };
 
-  // Compute local fallbacks
-  const localSales = orders.reduce((sum, o) => sum + o.total, 0);
-  const localOrders = orders.length;
-  const localTopItem = (() => {
-    const counts: Record<string, number> = {};
-    for (const o of orders) {
-      for (const c of o.cart) {
-        counts[c.item.name] = (counts[c.item.name] ?? 0) + c.qty;
-      }
-    }
-    let best = "";
-    let max = 0;
-    for (const [name, qty] of Object.entries(counts)) {
-      if (qty > max) {
-        max = qty;
-        best = name;
-      }
-    }
-    return best;
-  })();
-
-  const todaySales = remoteSales !== null ? remoteSales : localSales;
-  const todayOrders = remoteOrders !== null ? remoteOrders : localOrders;
-  const topItem = remoteTopItem !== null ? remoteTopItem : localTopItem;
-
-  return { addOrder, todaySales, todayOrders, topItem };
+  return {
+    addOrder,
+    refreshAnalytics,
+    todaySales: analytics.todaySales,
+    todayOrders: analytics.todayOrders,
+    topItem: analytics.topItem,
+    dbConnected: analytics.dbConnected,
+    analyticsLoading: analytics.loading,
+  };
 }

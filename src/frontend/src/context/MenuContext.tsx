@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+} from "react";
+import { toast } from "sonner";
 import { api } from "../api";
 
 export type MenuCategory =
@@ -20,84 +27,48 @@ export interface MenuItem {
 interface MenuContextValue {
   items: MenuItem[];
   loading: boolean;
-  addItem: (item: MenuItem) => void;
-  deleteItem: (id: string) => void;
-  updateItem: (item: MenuItem) => void;
-  toggleAvailability: (id: string) => void;
+  mutating: boolean;
+  addItem: (item: Omit<MenuItem, "id">) => Promise<void>;
+  deleteItem: (id: string) => Promise<void>;
+  updateItem: (item: MenuItem) => Promise<void>;
+  toggleAvailability: (id: string) => Promise<void>;
+  refetch: () => Promise<MenuItem[]>;
 }
 
 const MenuContext = createContext<MenuContextValue | null>(null);
 
-const SAMPLE_ITEMS: MenuItem[] = [
-  {
-    id: "1",
-    name: "Paneer Butter Masala",
-    price: 180,
-    category: "Veg",
-    imageUrl: "https://placehold.co/200x150/FF6B00/white?text=Paneer",
-    available: true,
-  },
-  {
-    id: "2",
-    name: "Chicken Biryani",
-    price: 250,
-    category: "Non-Veg",
-    imageUrl: "https://placehold.co/200x150/FFA500/white?text=Biryani",
-    available: true,
-  },
-  {
-    id: "3",
-    name: "Masala Chai",
-    price: 40,
-    category: "Drinks",
-    imageUrl: "https://placehold.co/200x150/FF8C00/white?text=Chai",
-    available: true,
-  },
-  {
-    id: "4",
-    name: "Veg Spring Rolls",
-    price: 120,
-    category: "Snacks",
-    imageUrl: "https://placehold.co/200x150/FF6B00/white?text=Rolls",
-    available: true,
-  },
-  {
-    id: "5",
-    name: "Mutton Curry",
-    price: 320,
-    category: "Non-Veg",
-    imageUrl: "https://placehold.co/200x150/FFA500/white?text=Mutton",
-    available: true,
-  },
-  {
-    id: "6",
-    name: "Mango Lassi",
-    price: 80,
-    category: "Drinks",
-    imageUrl: "https://placehold.co/200x150/FF8C00/white?text=Lassi",
-    available: true,
-  },
-  {
-    id: "7",
-    name: "Vanilla Ice Cream",
-    price: 60,
-    category: "Ice Cream",
-    imageUrl: "https://placehold.co/200x150/FFB6C1/white?text=IceCream",
-    available: true,
-  },
-];
-
-const STORAGE_KEY = "gopinath_menu_items";
+const STORAGE_KEY = "gopinath_menu_cache";
 
 function placeholderImage(name: string): string {
   return `https://placehold.co/200x150/FF6B00/white?text=${encodeURIComponent(name.substring(0, 6))}`;
 }
 
-function persistToLS(items: MenuItem[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+function mapRemoteItem(r: {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+  available: boolean;
+}): MenuItem {
+  return {
+    id: r.id,
+    name: r.name,
+    price: r.price,
+    category: r.category as MenuCategory,
+    available: r.available,
+    imageUrl: placeholderImage(r.name),
+  };
 }
 
-function loadFromLS(): MenuItem[] {
+function persistToLS(items: MenuItem[]) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+  } catch {
+    // ignore
+  }
+}
+
+function loadCacheFromLS(): MenuItem[] {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
@@ -110,100 +81,101 @@ function loadFromLS(): MenuItem[] {
   } catch {
     // ignore
   }
-  return SAMPLE_ITEMS;
+  return [];
 }
 
 export function MenuProvider({ children }: { children: React.ReactNode }) {
-  const [items, setItems] = useState<MenuItem[]>(loadFromLS);
-  const [loading, setLoading] = useState(false);
+  // Start with cached data for fast initial render, but always refetch from canister
+  const [items, setItems] = useState<MenuItem[]>(loadCacheFromLS);
+  const [loading, setLoading] = useState(true);
+  const [mutating, setMutating] = useState(false);
 
-  // Load from canister on mount
-  useEffect(() => {
-    setLoading(true);
-    api
-      .getMenu()
-      .then((remoteItems) => {
-        if (remoteItems.length > 0) {
-          const mapped: MenuItem[] = remoteItems.map((r) => ({
-            id: r.id,
-            name: r.name,
-            price: r.price,
-            category: r.category as MenuCategory,
-            available: r.available,
-            imageUrl: placeholderImage(r.name),
-          }));
-          setItems(mapped);
-          persistToLS(mapped);
-        }
-      })
-      .catch(() => {
-        // keep localStorage fallback
-      })
-      .finally(() => setLoading(false));
+  const fetchFromCanister = useCallback(async () => {
+    try {
+      const remoteItems = await api.getMenu();
+      const mapped = remoteItems.map(mapRemoteItem);
+      setItems(mapped);
+      persistToLS(mapped);
+      return mapped;
+    } catch (e) {
+      console.error("[MenuContext] getMenu failed", e);
+      throw e;
+    }
   }, []);
 
-  const addItem = (item: MenuItem) => {
-    const localItem: MenuItem = {
-      ...item,
-      available: item.available !== false,
-    };
-    setItems((prev) => {
-      const next = [...prev, localItem];
-      persistToLS(next);
-      return next;
-    });
-    // Persist to canister and replace temp id with canonical id
-    api
-      .addMenuItem(item.name, item.price, item.category)
-      .then((canonicalId) => {
-        setItems((prev) => {
-          const next = prev.map((i) =>
-            i.id === localItem.id ? { ...i, id: canonicalId } : i,
-          );
-          persistToLS(next);
-          return next;
-        });
-      })
+  // On mount: always load from canister (single source of truth)
+  useEffect(() => {
+    setLoading(true);
+    fetchFromCanister()
       .catch(() => {
-        // Keep local item as-is
-      });
+        // keep cached data as fallback
+      })
+      .finally(() => setLoading(false));
+  }, [fetchFromCanister]);
+
+  const addItem = async (item: Omit<MenuItem, "id">) => {
+    setMutating(true);
+    try {
+      await api.addMenuItem(item.name, item.price, item.category);
+      await fetchFromCanister();
+      toast.success(`"${item.name}" added to menu!`);
+    } catch (e) {
+      console.error("[MenuContext] addItem failed", e);
+      toast.error("Failed to save item. Please try again.");
+      throw e;
+    } finally {
+      setMutating(false);
+    }
   };
 
-  const deleteItem = (id: string) => {
-    api.deleteMenuItem(id).catch(() => {});
-    setItems((prev) => {
-      const next = prev.filter((item) => item.id !== id);
-      persistToLS(next);
-      return next;
-    });
+  const deleteItem = async (id: string) => {
+    const item = items.find((i) => i.id === id);
+    setMutating(true);
+    try {
+      await api.deleteMenuItem(id);
+      await fetchFromCanister();
+      toast.success(`"${item?.name ?? "Item"}" removed from menu.`);
+    } catch (e) {
+      console.error("[MenuContext] deleteItem failed", e);
+      toast.error("Failed to delete item. Please try again.");
+      throw e;
+    } finally {
+      setMutating(false);
+    }
   };
 
-  const updateItem = (updated: MenuItem) => {
-    api
-      .updateMenuItem(updated.id, updated.name, updated.price, updated.category)
-      .catch(() => {});
-    setItems((prev) => {
-      const next = prev.map((item) =>
-        item.id === updated.id
-          ? { ...updated, available: updated.available !== false }
-          : item,
+  const updateItem = async (updated: MenuItem) => {
+    setMutating(true);
+    try {
+      await api.updateMenuItem(
+        updated.id,
+        updated.name,
+        updated.price,
+        updated.category,
       );
-      persistToLS(next);
-      return next;
-    });
+      await fetchFromCanister();
+      toast.success(`"${updated.name}" updated!`);
+    } catch (e) {
+      console.error("[MenuContext] updateItem failed", e);
+      toast.error("Failed to update item. Please try again.");
+      throw e;
+    } finally {
+      setMutating(false);
+    }
   };
 
-  const toggleAvailability = (id: string) => {
-    api.toggleAvailability(id).catch(() => {});
-    setItems((prev) => {
-      const next = prev.map((item) =>
-        item.id === id
-          ? { ...item, available: !(item.available !== false) }
-          : item,
-      );
-      persistToLS(next);
-      return next;
-    });
+  const toggleAvailability = async (id: string) => {
+    setMutating(true);
+    try {
+      await api.toggleAvailability(id);
+      await fetchFromCanister();
+    } catch (e) {
+      console.error("[MenuContext] toggleAvailability failed", e);
+      toast.error("Failed to update availability. Please try again.");
+      throw e;
+    } finally {
+      setMutating(false);
+    }
   };
 
   return (
@@ -211,10 +183,12 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       value={{
         items,
         loading,
+        mutating,
         addItem,
         deleteItem,
         updateItem,
         toggleAvailability,
+        refetch: fetchFromCanister,
       }}
     >
       {children}

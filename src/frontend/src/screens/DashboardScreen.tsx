@@ -6,6 +6,8 @@ import {
   TrendingUp,
   User,
   Utensils,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import type { Screen } from "../App";
 import { Footer } from "../components/Footer";
@@ -24,7 +26,8 @@ export function DashboardScreen({
   darkMode,
   loggedInUser = "Owner",
 }: DashboardScreenProps) {
-  const { todaySales, todayOrders, topItem } = useOrders();
+  const { todaySales, todayOrders, topItem, dbConnected, analyticsLoading } =
+    useOrders();
 
   const bg = darkMode ? "bg-gray-900" : "bg-gray-50";
   const cardBg = darkMode ? "bg-gray-800" : "bg-white";
@@ -73,11 +76,46 @@ export function DashboardScreen({
       <div className="flex-1 flex flex-col px-5 gap-6 pt-6">
         {/* TODAY'S ANALYTICS — first section */}
         <div>
-          <p
-            className={`text-xs font-semibold uppercase tracking-widest ${subText} mb-3`}
-          >
-            Today's Analytics
-          </p>
+          {/* Section header with DB status */}
+          <div className="flex items-center justify-between mb-3">
+            <p
+              className={`text-xs font-semibold uppercase tracking-widest ${subText}`}
+            >
+              Today's Analytics
+            </p>
+            {/* DB Connection Status Badge */}
+            {!analyticsLoading && (
+              <div
+                data-ocid="dashboard.db.toggle"
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold ${
+                  dbConnected
+                    ? "bg-green-100 text-green-700"
+                    : "bg-red-100 text-red-600"
+                }`}
+              >
+                {dbConnected ? (
+                  <>
+                    <Wifi className="w-3 h-3" />
+                    <span>ICP DB Connected</span>
+                  </>
+                ) : (
+                  <>
+                    <WifiOff className="w-3 h-3" />
+                    <span>Offline</span>
+                  </>
+                )}
+              </div>
+            )}
+            {analyticsLoading && (
+              <div
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-gray-100 ${subText}`}
+              >
+                <span className="w-2 h-2 rounded-full bg-gray-400 animate-pulse" />
+                <span>Connecting...</span>
+              </div>
+            )}
+          </div>
+
           <div className="grid grid-cols-3 gap-4">
             <div
               data-ocid="dashboard.sales.card"

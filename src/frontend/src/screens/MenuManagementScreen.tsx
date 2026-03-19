@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Loader2,
   Pencil,
   Plus,
   Search,
@@ -49,8 +50,15 @@ export function MenuManagementScreen({
   darkMode,
   toggleDarkMode: _toggleDarkMode,
 }: MenuManagementScreenProps) {
-  const { items, addItem, deleteItem, updateItem, toggleAvailability } =
-    useMenu();
+  const {
+    items,
+    loading,
+    mutating,
+    addItem,
+    deleteItem,
+    updateItem,
+    toggleAvailability,
+  } = useMenu();
   const [showForm, setShowForm] = useState(false);
   const [formMode, setFormMode] = useState<FormMode>("add");
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -60,6 +68,7 @@ export function MenuManagementScreen({
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<Filter>("All");
+  const [savingId, setSavingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const bg = darkMode ? "bg-gray-900" : "bg-gray-50";
@@ -74,6 +83,8 @@ export function MenuManagementScreen({
     ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
     : "bg-white border-gray-200 text-gray-800 placeholder-gray-400";
   const labelText = darkMode ? "text-gray-300" : "text-gray-700";
+
+  const isBusy = loading || mutating;
 
   const filteredItems = items.filter((item) => {
     const matchSearch = item.name.toLowerCase().includes(search.toLowerCase());
@@ -114,7 +125,7 @@ export function MenuManagementScreen({
     setImagePreview(url);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!name.trim()) {
       toast.error("Item name is required.");
       return;
@@ -125,36 +136,36 @@ export function MenuManagementScreen({
       return;
     }
 
-    if (formMode === "edit" && editingId) {
-      const existing = items.find((i) => i.id === editingId);
-      const updatedItem: MenuItem = {
-        id: editingId,
-        name: name.trim(),
-        price: parsedPrice,
-        category,
-        imageUrl:
-          imagePreview ??
-          `https://placehold.co/200x150/FF6B00/white?text=${encodeURIComponent(name.trim().slice(0, 8))}`,
-        available: existing?.available !== false,
-      };
-      updateItem(updatedItem);
-      toast.success(`"${updatedItem.name}" updated!`);
-    } else {
-      const newItem: MenuItem = {
-        id: `item_${Date.now()}`,
-        name: name.trim(),
-        price: parsedPrice,
-        category,
-        imageUrl:
-          imagePreview ??
-          `https://placehold.co/200x150/FF6B00/white?text=${encodeURIComponent(name.trim().slice(0, 8))}`,
-        available: true,
-      };
-      addItem(newItem);
-      toast.success(`"${newItem.name}" added to menu!`);
+    try {
+      if (formMode === "edit" && editingId) {
+        const existing = items.find((i) => i.id === editingId);
+        const updatedItem: MenuItem = {
+          id: editingId,
+          name: name.trim(),
+          price: parsedPrice,
+          category,
+          imageUrl:
+            imagePreview ??
+            `https://placehold.co/200x150/FF6B00/white?text=${encodeURIComponent(name.trim().slice(0, 8))}`,
+          available: existing?.available !== false,
+        };
+        await updateItem(updatedItem);
+      } else {
+        await addItem({
+          name: name.trim(),
+          price: parsedPrice,
+          category,
+          imageUrl:
+            imagePreview ??
+            `https://placehold.co/200x150/FF6B00/white?text=${encodeURIComponent(name.trim().slice(0, 8))}`,
+          available: true,
+        });
+      }
+      resetForm();
+      setShowForm(false);
+    } catch {
+      // toast already shown in context
     }
-    resetForm();
-    setShowForm(false);
   };
 
   const handleCancel = () => {
@@ -162,9 +173,26 @@ export function MenuManagementScreen({
     setShowForm(false);
   };
 
-  const handleDelete = (item: MenuItem) => {
-    deleteItem(item.id);
-    toast.success(`"${item.name}" removed from menu.`);
+  const handleDelete = async (item: MenuItem) => {
+    setSavingId(item.id);
+    try {
+      await deleteItem(item.id);
+    } catch {
+      // toast already shown in context
+    } finally {
+      setSavingId(null);
+    }
+  };
+
+  const handleToggle = async (item: MenuItem) => {
+    setSavingId(item.id);
+    try {
+      await toggleAvailability(item.id);
+    } catch {
+      // toast already shown in context
+    } finally {
+      setSavingId(null);
+    }
   };
 
   return (
@@ -176,7 +204,14 @@ export function MenuManagementScreen({
         <div className="flex items-center h-16">
           <div className="flex-1" />
           <h1 className={`font-bold text-xl tracking-wider ${text}`}>Menu</h1>
-          <div className="flex-1 flex justify-end">
+          <div className="flex-1 flex justify-end items-center gap-2">
+            {/* Loading indicator in header */}
+            {isBusy && (
+              <Loader2
+                data-ocid="menu.loading_state"
+                className="w-4 h-4 text-orange-500 animate-spin"
+              />
+            )}
             <HeaderClock darkMode={darkMode} />
           </div>
         </div>
@@ -190,7 +225,6 @@ export function MenuManagementScreen({
             data-ocid="menu.form.panel"
             className={`${cardBg} rounded-2xl shadow-sm border ${border} p-6 mb-6`}
           >
-            {/* Back button in form */}
             <button
               type="button"
               onClick={handleCancel}
@@ -221,7 +255,8 @@ export function MenuManagementScreen({
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Dal Makhani"
                   data-ocid="menu.name.input"
-                  className={`w-full h-12 px-4 rounded-xl border focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-colors ${inputBg}`}
+                  disabled={mutating}
+                  className={`w-full h-12 px-4 rounded-xl border focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-colors ${inputBg} disabled:opacity-60`}
                 />
               </div>
               <div>
@@ -239,7 +274,8 @@ export function MenuManagementScreen({
                   placeholder="e.g. 150"
                   min="1"
                   data-ocid="menu.price.input"
-                  className={`w-full h-12 px-4 rounded-xl border focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-colors ${inputBg}`}
+                  disabled={mutating}
+                  className={`w-full h-12 px-4 rounded-xl border focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-colors ${inputBg} disabled:opacity-60`}
                 />
               </div>
               <div>
@@ -254,7 +290,8 @@ export function MenuManagementScreen({
                   value={category}
                   onChange={(e) => setCategory(e.target.value as MenuCategory)}
                   data-ocid="menu.category.select"
-                  className={`w-full h-12 px-4 rounded-xl border focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-colors ${inputBg}`}
+                  disabled={mutating}
+                  className={`w-full h-12 px-4 rounded-xl border focus:border-orange-400 focus:ring-2 focus:ring-orange-100 outline-none transition-colors ${inputBg} disabled:opacity-60`}
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c} value={c}>
@@ -273,7 +310,8 @@ export function MenuManagementScreen({
                 <button
                   type="button"
                   data-ocid="menu.image.dropzone"
-                  className={`w-full border-2 border-dashed rounded-xl p-4 text-center hover:border-orange-300 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 ${
+                  disabled={mutating}
+                  className={`w-full border-2 border-dashed rounded-xl p-4 text-center hover:border-orange-300 transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400 disabled:opacity-60 ${
                     darkMode ? "border-gray-600" : "border-gray-200"
                   }`}
                   onClick={() => fileRef.current?.click()}
@@ -310,16 +348,23 @@ export function MenuManagementScreen({
                 <button
                   type="button"
                   onClick={handleSave}
+                  disabled={mutating}
                   data-ocid="menu.save.primary_button"
-                  className="px-6 py-2 text-sm rounded-xl bg-gradient-to-r from-orange-400 to-orange-600 text-white font-semibold shadow-md hover:shadow-orange-200 hover:scale-[1.02] transition-all duration-200 active:scale-[0.98]"
+                  className="flex items-center gap-2 px-6 py-2 text-sm rounded-xl bg-gradient-to-r from-orange-400 to-orange-600 text-white font-semibold shadow-md hover:shadow-orange-200 hover:scale-[1.02] transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:pointer-events-none"
                 >
-                  {formMode === "edit" ? "Update Item" : "Save Item"}
+                  {mutating && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {mutating
+                    ? "Saving..."
+                    : formMode === "edit"
+                      ? "Update Item"
+                      : "Save Item"}
                 </button>
                 <button
                   type="button"
                   onClick={handleCancel}
+                  disabled={mutating}
                   data-ocid="menu.cancel.cancel_button"
-                  className="px-6 py-2 text-sm rounded-xl border-2 border-orange-400 text-orange-500 font-semibold hover:bg-orange-50 transition-colors"
+                  className="px-6 py-2 text-sm rounded-xl border-2 border-orange-400 text-orange-500 font-semibold hover:bg-orange-50 transition-colors disabled:opacity-60 disabled:pointer-events-none"
                 >
                   Cancel
                 </button>
@@ -344,11 +389,16 @@ export function MenuManagementScreen({
               <button
                 type="button"
                 onClick={openAddForm}
+                disabled={isBusy}
                 data-ocid="menu.add.primary_button"
-                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-sm hover:shadow-orange-200 hover:scale-[1.02] transition-all duration-200 active:scale-[0.98] whitespace-nowrap"
+                className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-xl bg-gradient-to-r from-orange-400 to-orange-600 text-white shadow-sm hover:shadow-orange-200 hover:scale-[1.02] transition-all duration-200 active:scale-[0.98] whitespace-nowrap disabled:opacity-60 disabled:pointer-events-none"
               >
-                <Plus className="w-4 h-4" />
-                Add Item
+                {isBusy ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+                {loading ? "Loading..." : "Add Item"}
               </button>
             </div>
 
@@ -379,7 +429,22 @@ export function MenuManagementScreen({
               All Menu Items ({filteredItems.length})
             </h2>
 
-            {filteredItems.length === 0 ? (
+            {/* Loading skeleton */}
+            {loading && items.length === 0 && (
+              <div
+                data-ocid="menu.loading_state"
+                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3"
+              >
+                {[1, 2, 3, 4, 5, 6].map((n) => (
+                  <div
+                    key={n}
+                    className={`${cardBg} rounded-2xl border ${border} h-48 animate-pulse`}
+                  />
+                ))}
+              </div>
+            )}
+
+            {!loading && filteredItems.length === 0 ? (
               <div
                 data-ocid="menu.items.empty_state"
                 className={`text-center py-16 ${subText}`}
@@ -388,20 +453,21 @@ export function MenuManagementScreen({
                 <p>
                   {search || activeFilter !== "All"
                     ? "No items match your filters."
-                    : "No menu items yet."}
+                    : "No menu items yet. Add your first item!"}
                 </p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                 {filteredItems.map((item, idx) => {
                   const isAvailable = item.available !== false;
+                  const isThisItemBusy = savingId === item.id;
                   return (
                     <div
                       key={item.id}
                       data-ocid={`menu.items.item.${idx + 1}`}
                       className={`${cardBg} rounded-2xl border ${border} shadow-sm flex flex-col overflow-hidden hover:shadow-md transition-shadow ${
                         !isAvailable ? "opacity-70" : ""
-                      }`}
+                      } ${isThisItemBusy ? "pointer-events-none" : ""}`}
                     >
                       <div className="relative">
                         <img
@@ -413,13 +479,20 @@ export function MenuManagementScreen({
                               `https://placehold.co/200x150/FF6B00/white?text=${encodeURIComponent(item.name.slice(0, 2))}`;
                           }}
                         />
+                        {/* Saving overlay */}
+                        {isThisItemBusy && (
+                          <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                            <Loader2 className="w-6 h-6 text-orange-500 animate-spin" />
+                          </div>
+                        )}
                         {/* Edit/Delete overlay */}
                         <div className="absolute top-1.5 right-1.5 flex gap-1">
                           <button
                             type="button"
                             onClick={() => openEditForm(item)}
+                            disabled={isBusy}
                             data-ocid={`menu.edit.edit_button.${idx + 1}`}
-                            className="w-7 h-7 rounded-lg bg-white/90 backdrop-blur-sm flex items-center justify-center text-orange-500 hover:bg-orange-50 hover:text-orange-600 shadow-sm transition-colors"
+                            className="w-7 h-7 rounded-lg bg-white/90 backdrop-blur-sm flex items-center justify-center text-orange-500 hover:bg-orange-50 hover:text-orange-600 shadow-sm transition-colors disabled:opacity-60"
                             title="Edit item"
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -427,8 +500,9 @@ export function MenuManagementScreen({
                           <button
                             type="button"
                             onClick={() => handleDelete(item)}
+                            disabled={isBusy}
                             data-ocid={`menu.delete.delete_button.${idx + 1}`}
-                            className="w-7 h-7 rounded-lg bg-white/90 backdrop-blur-sm flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 shadow-sm transition-colors"
+                            className="w-7 h-7 rounded-lg bg-white/90 backdrop-blur-sm flex items-center justify-center text-red-400 hover:bg-red-50 hover:text-red-600 shadow-sm transition-colors disabled:opacity-60"
                             title="Delete item"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -459,13 +533,13 @@ export function MenuManagementScreen({
                               htmlFor={`avail-toggle-${item.id}`}
                               className="flex items-center gap-1 cursor-pointer"
                             >
-                              {/* Custom toggle switch */}
                               <div className="relative">
                                 <input
                                   id={`avail-toggle-${item.id}`}
                                   type="checkbox"
                                   checked={isAvailable}
-                                  onChange={() => toggleAvailability(item.id)}
+                                  onChange={() => handleToggle(item)}
+                                  disabled={isBusy}
                                   data-ocid={`menu.availability.toggle.${idx + 1}`}
                                   className="sr-only"
                                 />
