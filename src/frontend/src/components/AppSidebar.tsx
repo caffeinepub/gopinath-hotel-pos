@@ -12,7 +12,7 @@ const LOGO_PATH = `${import.meta.env.BASE_URL}assets/uploads/homeScreenLogo-1.jp
 interface AppSidebarProps {
   activeScreen: Screen;
   onNavigate: (screen: Screen) => void;
-  onLogout: () => void;
+  onLogoutRequest: () => void;
   darkMode: boolean;
   userRole: "owner" | "staff";
 }
@@ -54,7 +54,7 @@ const allNavItems: {
 export function AppSidebar({
   activeScreen,
   onNavigate,
-  onLogout,
+  onLogoutRequest,
   darkMode,
   userRole,
 }: AppSidebarProps) {
@@ -117,11 +117,11 @@ export function AppSidebar({
       </nav>
 
       {/* Logout */}
-      <div className={`px-3 pb-6 pt-4 border-t ${divider}`}>
+      <div className={`px-3 pt-4 border-t ${divider}`}>
         <button
           type="button"
           data-ocid="sidebar.logout.button"
-          onClick={onLogout}
+          onClick={onLogoutRequest}
           className={`w-full flex items-center gap-3 py-3 px-4 rounded-xl border border-orange-200 font-semibold text-sm transition-colors ${
             darkMode
               ? "bg-gray-800 hover:bg-orange-950/30"
@@ -131,6 +131,15 @@ export function AppSidebar({
           <LogOut className="w-5 h-5 text-orange-500" />
           <span className="text-orange-500">Logout</span>
         </button>
+      </div>
+
+      {/* Footer */}
+      <div className={`px-3 py-3 border-t ${divider}`}>
+        <p
+          className={`text-center text-xs ${darkMode ? "text-gray-500" : "text-gray-400"}`}
+        >
+          Powered By NextYU Solution
+        </p>
       </div>
     </aside>
   );

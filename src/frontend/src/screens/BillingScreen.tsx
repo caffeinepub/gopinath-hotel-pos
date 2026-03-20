@@ -88,7 +88,9 @@ export function BillingScreen({
           <div className="flex-1" />
           <h1 className={`font-bold text-xl tracking-wider ${text}`}>Bill</h1>
           <div className="flex-1 flex justify-end">
-            <HeaderClock darkMode={darkMode} />
+            <div className="hidden lg:block">
+              <HeaderClock darkMode={darkMode} />
+            </div>
           </div>
         </div>
         <div className="h-0.5 bg-gradient-to-r from-orange-500 to-orange-300 -mx-6" />

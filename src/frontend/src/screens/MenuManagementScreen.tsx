@@ -121,8 +121,12 @@ export function MenuManagementScreen({
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const url = URL.createObjectURL(file);
-    setImagePreview(url);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      setImagePreview(dataUrl);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSave = async () => {
@@ -212,7 +216,9 @@ export function MenuManagementScreen({
                 className="w-4 h-4 text-orange-500 animate-spin"
               />
             )}
-            <HeaderClock darkMode={darkMode} />
+            <div className="hidden lg:block">
+              <HeaderClock darkMode={darkMode} />
+            </div>
           </div>
         </div>
         <div className="h-0.5 bg-gradient-to-r from-orange-500 to-orange-300 -mx-6" />

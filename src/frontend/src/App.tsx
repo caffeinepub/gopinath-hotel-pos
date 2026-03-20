@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type { Screen } from "./App.types";
 import { AppSidebar } from "./components/AppSidebar";
 import { BottomNav } from "./components/BottomNav";
+import { LogoutConfirmDialog } from "./components/LogoutConfirmDialog";
 import { MobileHeader } from "./components/MobileHeader";
 import { MenuProvider } from "./context/MenuContext";
 import { useOrders } from "./hooks/useOrders";
@@ -64,6 +65,7 @@ export default function App() {
   const [userRole, setUserRole] = useState<"owner" | "staff">(
     (saved?.role as "owner" | "staff") ?? "owner",
   );
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const { settings } = useSettings();
   const { addOrder } = useOrders();
 
@@ -95,6 +97,10 @@ export default function App() {
     setScreen("loginSelect");
     setLoggedInUser("");
     setUserRole("owner");
+  };
+
+  const handleLogoutRequest = () => {
+    setShowLogoutConfirm(true);
   };
 
   const handleLogin = (
@@ -153,6 +159,16 @@ export default function App() {
       >
         <Toaster position="top-center" richColors />
 
+        {/* Logout confirmation dialog */}
+        <LogoutConfirmDialog
+          open={showLogoutConfirm}
+          onConfirm={() => {
+            setShowLogoutConfirm(false);
+            handleLogout();
+          }}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
+
         {screen === "welcome" && <WelcomeScreen onNavigate={navigate} />}
         {screen === "loginSelect" && (
           <LoginSelectScreen onNavigate={navigate} />
@@ -177,7 +193,7 @@ export default function App() {
             <AppSidebar
               activeScreen={screen}
               onNavigate={navigate}
-              onLogout={handleLogout}
+              onLogoutRequest={handleLogoutRequest}
               darkMode={darkMode}
               userRole={userRole}
             />
@@ -228,7 +244,7 @@ export default function App() {
             <BottomNav
               activeScreen={screen}
               onNavigate={navigate}
-              onLogout={handleLogout}
+              onLogoutRequest={handleLogoutRequest}
               darkMode={darkMode}
               userRole={userRole}
             />

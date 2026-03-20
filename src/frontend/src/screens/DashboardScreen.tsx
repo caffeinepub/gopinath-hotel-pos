@@ -40,9 +40,9 @@ export function DashboardScreen({
 
   return (
     <div className={`min-h-screen flex flex-col ${bg}`}>
-      {/* Header */}
+      {/* Header — hidden on mobile (MobileHeader already shows this), visible on desktop */}
       <header
-        className={`${headerBg} border-b px-6 py-0 sticky top-0 z-10 shadow-sm`}
+        className={`${headerBg} border-b px-6 py-0 sticky top-0 z-10 shadow-sm hidden lg:flex flex-col`}
       >
         <div className="flex items-center h-16 gap-4">
           {/* Clock on left */}

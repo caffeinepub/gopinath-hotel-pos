@@ -38,6 +38,67 @@ interface MenuContextValue {
 const MenuContext = createContext<MenuContextValue | null>(null);
 
 const STORAGE_KEY = "gopinath_menu_cache";
+const IMAGE_CACHE_KEY = "pos_item_images";
+
+function loadImageCache(): Record<string, string> {
+  try {
+    return JSON.parse(localStorage.getItem(IMAGE_CACHE_KEY) || "{}");
+  } catch {
+    return {};
+  }
+}
+
+// Compress image data URL to max 200x150 JPEG at 0.65 quality to prevent localStorage quota errors
+async function compressImage(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      const MAX_W = 200;
+      const MAX_H = 150;
+      let w = img.width;
+      let h = img.height;
+      if (w > MAX_W || h > MAX_H) {
+        const ratio = Math.min(MAX_W / w, MAX_H / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        resolve(dataUrl);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL("image/jpeg", 0.65));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
+export async function saveImageCache(id: string, dataUrl: string) {
+  try {
+    const compressed = dataUrl.startsWith("data:")
+      ? await compressImage(dataUrl)
+      : dataUrl;
+    const cache = loadImageCache();
+    cache[id] = compressed;
+    localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(cache));
+    console.log(
+      "[ImageCache] Saved image for id:",
+      id,
+      "size:",
+      compressed.length,
+    );
+  } catch (e) {
+    console.warn(
+      "[ImageCache] Could not save image (quota?), item will use placeholder",
+      e,
+    );
+  }
+}
 
 function placeholderImage(name: string): string {
   return `https://placehold.co/200x150/FF6B00/white?text=${encodeURIComponent(name.substring(0, 6))}`;
@@ -50,13 +111,14 @@ function mapRemoteItem(r: {
   category: string;
   available: boolean;
 }): MenuItem {
+  const cache = loadImageCache();
   return {
     id: r.id,
     name: r.name,
     price: r.price,
     category: r.category as MenuCategory,
     available: r.available,
-    imageUrl: placeholderImage(r.name),
+    imageUrl: cache[r.id] ?? placeholderImage(r.name),
   };
 }
 
@@ -91,16 +153,13 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
 
   const fetchFromCanister = useCallback(async () => {
     console.log("[MenuContext] Fetching menu from canister...");
-    // getMenu throws on error -- don't catch here
     const remoteItems = await api.getMenuRaw();
     console.log("[MenuContext] Menu fetched:", remoteItems.length, "items");
     const mapped = remoteItems.map(mapRemoteItem);
-    // Only update cache/state if we got real data (avoid overwriting with empty on error)
-    if (mapped.length >= 0) {
+    // Only update state if we got real data (avoid overwriting with empty on error)
+    if (mapped.length > 0) {
       setItems(mapped);
-      if (mapped.length > 0) {
-        persistToLS(mapped);
-      }
+      persistToLS(mapped);
     }
     return mapped;
   }, []);
@@ -115,7 +174,6 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     fetchFromCanister()
       .catch((e) => {
         console.error("[MenuContext] getMenu failed, keeping cached data", e);
-        // keep cached data as fallback -- do NOT clear it
       })
       .finally(() => setLoading(false));
   }, [fetchFromCanister]);
@@ -126,7 +184,10 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       console.log("[MenuContext] Adding menu item:", item.name);
       const newId = await api.addMenuItem(item.name, item.price, item.category);
       console.log("[MenuContext] Item added with id:", newId);
-      // Refetch from canister to confirm save
+      // Save image to cache with real canister ID (async, compressed)
+      if (item.imageUrl?.startsWith("data:")) {
+        await saveImageCache(newId, item.imageUrl);
+      }
       await fetchFromCanister();
       toast.success(`"${item.name}" added to menu!`);
     } catch (e) {
@@ -145,6 +206,14 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
       console.log("[MenuContext] Deleting menu item:", id);
       await api.deleteMenuItem(id);
       console.log("[MenuContext] Item deleted:", id);
+      // Remove image from cache
+      try {
+        const cache = loadImageCache();
+        delete cache[id];
+        localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(cache));
+      } catch {
+        /* ignore */
+      }
       await fetchFromCanister();
       toast.success(`"${item?.name ?? "Item"}" removed from menu.`);
     } catch (e) {
@@ -160,6 +229,10 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     setMutating(true);
     try {
       console.log("[MenuContext] Updating menu item:", updated.id);
+      // Save image to cache before updating (async, compressed)
+      if (updated.imageUrl?.startsWith("data:")) {
+        await saveImageCache(updated.id, updated.imageUrl);
+      }
       await api.updateMenuItem(
         updated.id,
         updated.name,

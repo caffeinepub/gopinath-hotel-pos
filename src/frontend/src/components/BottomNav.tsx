@@ -10,7 +10,7 @@ import type { Screen } from "../App";
 interface BottomNavProps {
   activeScreen: Screen;
   onNavigate: (screen: Screen) => void;
-  onLogout: () => void;
+  onLogoutRequest: () => void;
   darkMode: boolean;
   userRole: "owner" | "staff";
 }
@@ -47,7 +47,7 @@ const allNavItems: {
 export function BottomNav({
   activeScreen,
   onNavigate,
-  onLogout,
+  onLogoutRequest,
   darkMode,
   userRole,
 }: BottomNavProps) {
@@ -99,7 +99,8 @@ export function BottomNav({
       {/* Logout button */}
       <button
         type="button"
-        onClick={onLogout}
+        data-ocid="bottomnav.logout.button"
+        onClick={onLogoutRequest}
         className={`flex flex-col items-center justify-center flex-1 py-2 gap-0.5 rounded-xl ${
           darkMode ? "text-gray-400" : "text-gray-500"
         }`}
